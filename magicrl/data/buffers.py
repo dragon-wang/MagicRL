@@ -1,3 +1,4 @@
+from abc import abstractmethod, ABC, ABCMeta
 import torch
 import numpy as np
 from typing import Sequence, Type, Optional, List, Union, Dict
@@ -6,7 +7,7 @@ from typing import Sequence, Type, Optional, List, Union, Dict
 def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
     """Initial the buffer from a transition dict sampled from the environment.
 
-    The transition is like:
+    The transition may be like:
     "obs": "vector": "vector_0": np.ndarray (a1,)
                      "vector_1": np.ndarray (a2,)
                      ...
@@ -25,7 +26,7 @@ def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
            "visual": "visual_0": np.empty (n, b1, c1)
                      "visual_0": np.empty (n, b2, c2)
                      ...
-    "act": "discrete": np.empty (n, )  # scalar
+    "act": "discrete": np.empty (n, )
            "continuous": np.empty (n, e1)
     "rew": np.empty (n, )  # scalar
     "done": np.empty (n, )  # scalar
@@ -37,6 +38,7 @@ def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
     """
     for k, v in transition.items():
         if not isinstance(v, Dict):
+            v = np.array(v)
             buffer[k] = np.empty((buffer_size, ) + v.shape, v.dtype)
         else:
             buffer[k] = {}
@@ -113,9 +115,47 @@ def _get_trans(buffer: Dict, index: Union[int, Sequence[int]]):
     return trans
 
 
-class ReplayBuffer():
-    def __init__(self, buffer_size, batch_size):
+def _to_tensor(data: Dict, device, dtype=torch.float32):
+    """Convert all ndarrays in buffer or batch to tensors.
+
+    Args:
+        batch (Dict): the buffer or batch that need to convert.
+        device (_type_): the device in torch.
+        dtype (_type_): the dtype of tensor.
+    """
+    for k, v in data.items():
+        if not isinstance(v, Dict):
+            data[k] = torch.as_tensor(data[k], dtype=dtype, device=device)
+        else:
+            _to_tensor(data[k], device)
+
+
+class BaseBuffer(ABC):
+    def __init__(self, buffer_size):
         self.buffer_size = buffer_size
+    
+    @abstractmethod
+    def add(self, transition: Dict):
+        pass
+    
+    @abstractmethod
+    def sample(self):
+        pass
+
+    @abstractmethod
+    def save(self):
+        # save to hdf5
+        pass
+
+    @abstractmethod
+    def load(self):
+        # load from hdf5
+        pass
+
+class ReplayBuffer(BaseBuffer):
+    def __init__(self, batch_size, **kwargs):
+        super().__init__(**kwargs)
+
         self.batch_size = batch_size
 
         self._buffer = {}
@@ -129,9 +169,11 @@ class ReplayBuffer():
         self._pointer = (self._pointer + 1) % self.buffer_size
         self._current_size = min(self._current_size + 1, self.buffer_size)
 
-    def sample(self):
+    def sample(self, device=None, dtype=torch.float32):
         indexes = np.random.choice(self._current_size, size=self.batch_size, replace=True)
         samples = _get_trans(self._buffer, indexes)
+        if device is not None:
+            _to_tensor(samples, device, dtype=dtype)
         return samples
 
     def save(self):
