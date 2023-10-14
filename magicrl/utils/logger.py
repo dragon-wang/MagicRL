@@ -12,6 +12,8 @@ LOG_DIR = os.path.join(ROOT_DIR, "results")
 def _make_dir(dir):
     if not os.path.exists(dir):
         os.makedirs(dir)
+    else:
+        raise OSError("The result of the given learn_id already exists, please change a different learn_id or delete the existed result.")
     return dir
 
 
@@ -24,10 +26,9 @@ def _clean_dir(dir):
 
 
 class LearnLogger:
-    def __init__(self, learn_id, resume):
+    def __init__(self, learn_id, resume=False):
         self.learn_log_dir = os.path.join(LOG_DIR, learn_id, "learn_log")
         if not resume:
-            _clean_dir(self.learn_log_dir)
             _make_dir(self.learn_log_dir)
         self.writer = SummaryWriter(self.learn_log_dir)
 
@@ -43,14 +44,13 @@ class LearnLogger:
 
 
 class AgentLogger:
-    def __init__(self, learn_id, resume):
+    def __init__(self, learn_id, resume=False):
         self.agent_log_dir = os.path.join(LOG_DIR, learn_id, "agent_log")
         if not resume:
-            _clean_dir(self.agent_log_dir)
             _make_dir(self.agent_log_dir)
 
     def log_agent(self, agent, step):
-        checkpoint_path = os.path.join(self.agent_log_dir, "checkpoint_" + str(step))
+        checkpoint_path = os.path.join(self.agent_log_dir, "checkpoint_" + str(step) + ".pth")
         checkpoint = {}
         for attr_name in agent.attr_names:
             checkpoint[attr_name] = getattr(agent, attr_name)
@@ -58,12 +58,14 @@ class AgentLogger:
         print("The agent is saved in ", checkpoint_path)
 
     def load_agent(self, agent, step):
-        checkpoint_path = os.path.join(self.agent_log_dir, "checkpoint_" + str(step))
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint_names = os.listdir(self.agent_log_dir)
+        if step < 0:
+            checkpoint_name = sorted(checkpoint_names, key=lambda x: int(x.split('.')[0].split('_')[-1]))[-1]
+        else:
+            checkpoint_name = "checkpoint_" + str(step) + ".pth"
+        checkpoint_path = os.path.join(self.agent_log_dir, checkpoint_name)
+        checkpoint = torch.load(checkpoint_path, map_location=agent.device)
         for attr_name in agent.attr_names:
             setattr(agent, attr_name, checkpoint[attr_name])
         print("The agent is loaded from ", checkpoint_path)
 
-if __name__=="__main__":
-    print(ROOT_DIR)
-    _clean_dir("/Users/wt/Documents/PythonProjects/MagicRL/results")

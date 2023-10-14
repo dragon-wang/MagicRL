@@ -16,7 +16,7 @@ act_dim = train_env.action_space.n
 
 q_net = MLP(input_dim=obs_dim, output_dim=act_dim, hidden_size=[256, 256])
 
-agent = DQNAgent(Q_net=q_net, action_dim=act_dim, device='cuda')
+agent = DQNAgent(Q_net=q_net, action_dim=act_dim, device='cpu')
 
 replaybuffer = ReplayBuffer(buffer_size=5000, batch_size=128)
 
@@ -32,6 +32,6 @@ learner = OffPolicyLearner(explore_step=500,
                             eval_freq=1000,
                             resume=False)
 
-learner.learn()
+# learner.learn()
 # 
-# learner.inference(10, 2000, infer_env)
+learner.inference(infer_env, 10)

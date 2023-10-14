@@ -16,7 +16,7 @@ def evaluate_agent(eval_env, agent: BaseAgent, episode_num: int, render=False):
             if render:
                 eval_env.render()
             action = agent.select_action(obs, eval=True)
-            action = action[0] if isinstance(action, tuple) else action
+            # action = action[0] if isinstance(action, tuple) else action
             obs, reward, terminated, truncated, _ = eval_env.step(action)
             done = np.logical_or(terminated, truncated)
             episode_reward += reward

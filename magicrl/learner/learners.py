@@ -3,7 +3,7 @@ import torch
 from magicrl.utils.logger import LearnLogger, AgentLogger
 from magicrl.data.buffers import BaseBuffer
 from magicrl.agents.base import BaseAgent
-from magicrl.learner.exploration import explore_randomly
+from magicrl.learner.exploration import explore_randomly, explore_by_agent
 from magicrl.learner.evaluation import evaluate_agent
 import numpy as np
 
@@ -31,16 +31,14 @@ class LearnerBase(ABC):
         self.eval_freq = eval_freq
         self.resume = resume
 
-        self.learner_logger = LearnLogger(learn_id, resume)
-        self.agent_logger = AgentLogger(learn_id ,resume)
-
     @abstractmethod
     def learn(self):
         pass  
 
-    def inference(self, episode_num, step, env):
-        self.agent_logger.load_agent(self.agent, step)
-        evaluate_agent(env, self.agent, episode_num=episode_num, render=True)
+    def inference(self, infer_env, episode_num):
+        agent_logger = AgentLogger(self.learn_id ,True)
+        agent_logger.load_agent(self.agent, -1)
+        evaluate_agent(infer_env, self.agent, episode_num=episode_num, render=True)
 
 
 class OffPolicyLearner(LearnerBase):
@@ -52,49 +50,61 @@ class OffPolicyLearner(LearnerBase):
         self.explore_step = explore_step
     
     def learn(self):
-        explore_randomly(self.train_env, self.buffer, self.explore_step)
-        print("==============================start train===================================")
-        obs, _ = self.train_env.reset()
-        episode_reward = 0
-        episode_length = 0
+        try:
+            learner_logger = LearnLogger(self.learn_id, self.resume)
+            agent_logger = AgentLogger(self.learn_id ,self.resume)
+            if self.resume:
+                agent_logger.load_agent(self.agent, -1)
+                explore_by_agent(self.train_env, self.agent, self.buffer, self.explore_step)
+            else:
+                explore_randomly(self.train_env, self.buffer, self.explore_step)
+            print("==============================start train===================================")
+            obs, _ = self.train_env.reset()
+            episode_reward = 0
+            episode_length = 0
 
-        # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
-        while self.agent.train_step < self.max_train_step:
-            act = self.agent.select_action(np.array(obs), eval=False)
-            next_obs, rew, terminated, truncated, info = self.train_env.step(act)
-            done = np.logical_or(terminated, truncated)
-            episode_reward += rew
-            transition = {"obs": obs,
-                          "act": act,
-                          "rew": rew,
-                          "next_obs": next_obs,
-                          "done": done}
-            self.buffer.add(transition)
-            obs = next_obs
-            episode_length += 1
+            # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
+            while self.agent.train_step < self.max_train_step:
+                act = self.agent.select_action(np.array(obs), eval=False)
+                next_obs, rew, terminated, truncated, info = self.train_env.step(act)
+                done = np.logical_or(terminated, truncated)
+                episode_reward += rew
+                transition = {"obs": obs,
+                            "act": act,
+                            "rew": rew,
+                            "next_obs": next_obs,
+                            "done": done}
+                self.buffer.add(transition)
+                obs = next_obs
+                episode_length += 1
 
-            batch = self.buffer.sample(device=self.agent.device)
-            train_summaries = self.agent.train(batch)
-            self.agent.train_step += 1
+                batch = self.buffer.sample(device=self.agent.device)
+                train_summaries = self.agent.train(batch)
+                self.agent.train_step += 1
 
-            if done:
-                self.agent.train_episode += 1
-                obs, _ = self.train_env.reset()
+                if done:
+                    self.agent.train_episode += 1
+                    obs, _ = self.train_env.reset()
+                
+                    print(f"Time Step: {self.agent.train_step} Episode Num: {self.agent.train_episode}"
+                        f"Episode Length: {episode_length} Episode Reward: {episode_reward:.2f}")
+                    learner_logger.log_train_data({"episode_length": episode_length,
+                                                        "episode_reward": episode_reward}, self.agent.train_step)
+                    episode_reward = 0
+                    episode_length = 0
+
+                if self.agent.train_step % self.learner_log_freq == 0:
+                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+
+                if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
+                    evaluate_summaries = evaluate_agent(self.eval_env, self.agent, episode_num=10)
+                    print(evaluate_summaries)
+                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                
+                if self.agent.train_step % self.agent_log_freq == 0:
+                    agent_logger.log_agent(self.agent, self.agent.train_step)
+
+        except KeyboardInterrupt:
+            print("Saving agent.......")
+            agent_logger.log_agent(self.agent, self.agent.train_step)
             
-                print(f"Time Step: {self.agent.train_step} Episode Num: {self.agent.train_episode}"
-                      f"Episode Length: {episode_length} Episode Reward: {episode_reward:.2f}")
-                self.learner_logger.log_train_data({"episode_length": episode_length,
-                                                    "episode_reward": episode_reward}, self.agent.train_step)
-                episode_reward = 0
-                episode_length = 0
-
-            if self.agent.train_step % self.learner_log_freq == 0:
-                self.learner_logger.log_train_data(train_summaries, self.agent.train_step)
-
-            if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
-                evaluate_summaries = evaluate_agent(self.eval_env, self.agent, episode_num=10)
-                print(evaluate_summaries)
-                self.learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
-            
-            if self.agent.train_step % self.agent_log_freq == 0:
-                self.agent_logger.log_agent(self.agent, self.agent.train_step)
