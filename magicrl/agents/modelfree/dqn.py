@@ -36,7 +36,7 @@ class DQNAgent(BaseAgent):
 
         self.act_num = q_net.act_num
 
-        self.attr_names.extend(["q_net", "target_q_net", "optim"])
+        self.attr_names.extend(['q_net', 'target_q_net', 'optim'])
 
     def select_action(self, obs, eval=False):
         eps = self.eval_eps if eval else max(self.slope * self.train_step + self.initial_eps, self.end_eps)

@@ -17,7 +17,7 @@ class DDPGAgent(BaseAgent):
                  actor_lr=1e-4,
                  critic_lr=1e-3,
                  tau=0.005,  # used to update target network, w' = tau*w + (1-tau)*w'
-                 gaussian_noise_sigma=0.1, 
+                 exploration_noise=0.1, 
                  **kwargs        
                  ):
         super().__init__(**kwargs)
@@ -33,9 +33,9 @@ class DDPGAgent(BaseAgent):
         self.critic_optim = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
 
         self.tau = tau
-        self.gaussian_noise_sigma = gaussian_noise_sigma
+        self.exploration_noise = exploration_noise
 
-        self.attr_names.extend(["actor", "target_actor", "critic", "target_critic", "actor_optim", "critic_optim"])
+        self.attr_names.extend(['actor', 'target_actor', 'critic', 'target_critic', 'actor_optim', 'critic_optim'])
 
 
     def select_action(self, obs, eval=False):
@@ -46,7 +46,7 @@ class DDPGAgent(BaseAgent):
         if eval:
             return action
         else:
-            noise = np.random.normal(0, self.gaussian_noise_sigma, size=self.act_dim)
+            noise = np.random.normal(0, self.exploration_noise, size=self.act_dim)
             return (action + noise).clip(-self.act_bound, self.act_bound)
 
     def train(self, batch):

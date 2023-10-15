@@ -26,7 +26,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    def train(self):
+    def train(self, batch):
         """The main body of rl algorithm
         """
         pass
