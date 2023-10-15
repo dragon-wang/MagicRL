@@ -11,7 +11,10 @@ class BaseAgent(ABC):
         
         self.train_step = 0
         self.train_episode = 0
-        
+
+        # The attributions that needed to be saved by logger.AgentLogger
+        self.attr_names = ["train_step", "train_episode"]
+
     @abstractmethod
     def select_action(self, obs, eval=False):
         """Select an action according to the observation

@@ -24,7 +24,7 @@ agent = DDPGAgent(actor=actor, critic=critic, device='cuda')
 replaybuffer = ReplayBuffer(buffer_size=500000, batch_size=64)
 
 learner = OffPolicyLearner(explore_step=500,
-                           learn_id="ddpg_test_cuda",
+                           learn_id="ddpg_test_cuda2",
                            train_env=train_env,
                            eval_env=eval_env,
                            agent=agent,

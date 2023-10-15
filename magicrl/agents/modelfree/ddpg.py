@@ -35,7 +35,8 @@ class DDPGAgent(BaseAgent):
         self.tau = tau
         self.gaussian_noise_sigma = gaussian_noise_sigma
 
-        self.attr_names = ["actor", "target_actor", "critic", "target_critic", "actor_optim", "critic_optim"]
+        self.attr_names.extend(["actor", "target_actor", "critic", "target_critic", "actor_optim", "critic_optim"])
+
 
     def select_action(self, obs, eval=False):
         obs = torch.FloatTensor(obs).reshape(1, -1).to(self.device)
