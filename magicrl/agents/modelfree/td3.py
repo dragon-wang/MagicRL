@@ -31,10 +31,10 @@ class TD3Agent(BaseAgent):
 
         # the network and optimizers
         self.actor = actor.to(self.device)
-        self.target_actor = copy.deepcopy(self.actor)
         self.critic1 = critic1.to(self.device)
-        self.target_critic1 = copy.deepcopy(self.critic1)
         self.critic2 = critic2.to(self.device)
+        self.target_actor = copy.deepcopy(self.actor)
+        self.target_critic1 = copy.deepcopy(self.critic1)
         self.target_critic2 = copy.deepcopy(self.critic2)
         self.actor_optim = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optim1 = torch.optim.Adam(self.critic1.parameters(), lr=critic_lr)
