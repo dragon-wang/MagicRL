@@ -4,7 +4,7 @@ from magicrl.utils.logger import LearnLogger, AgentLogger
 from magicrl.data.buffers import BaseBuffer
 from magicrl.agents.base import BaseAgent
 from magicrl.learner.exploration import explore_randomly, explore_by_agent
-from magicrl.learner.evaluation import evaluate_agent
+from magicrl.learner.evaluation import evaluate_agent, infer_agent
 import numpy as np
 
 class LearnerBase(ABC):
@@ -38,7 +38,7 @@ class LearnerBase(ABC):
     def inference(self, infer_env, episode_num):
         agent_logger = AgentLogger(self.learn_id ,True)
         agent_logger.load_agent(self.agent, -1)
-        evaluate_agent(infer_env, self.agent, episode_num=episode_num, render=True)
+        infer_agent(infer_env, self.agent, episode_num=episode_num)
 
 
 class OffPolicyLearner(LearnerBase):
