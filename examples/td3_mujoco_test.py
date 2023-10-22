@@ -31,7 +31,7 @@ agent = TD3Agent(actor=actor, critic1=critic1, critic2=critic2, device='cuda')
 replaybuffer = ReplayBuffer(buffer_size=1000000, batch_size=100)
 
 learner = OffPolicyLearner(explore_step=10000,
-                           learn_id="td3_hopper-v4_test",
+                           learn_id="td3_hopper-v4_123123",
                            train_env=train_env,
                            eval_env=eval_env,
                            agent=agent,
