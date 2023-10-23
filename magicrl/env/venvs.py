@@ -1,16 +1,16 @@
 from typing import Any, Optional, Tuple, Union, List
-from magicrl.env.utils import venvs_step_type
+
 import gymnasium as gym
 import numpy as np
-import torch
 
-from magicrl.env.worker.base import EnvWorker
-from magicrl.env.worker.dummy import DummyEnvWokrder
-from magicrl.env.worker.subproc import SubprocEnvWorker
+from magicrl.env.utils import venvs_step_type
+from magicrl.env.worker import BaseEnvWorker
+from magicrl.env.worker import DummyEnvWokrder
+from magicrl.env.worker import SubprocEnvWorker
 
 
 class BaseVectorEnv:
-    def __init__(self, envs: List[gym.Env], worker_class: EnvWorker) -> None:
+    def __init__(self, envs: List[gym.Env], worker_class: BaseEnvWorker) -> None:
         self.workers = [worker_class(env) for env in envs]
         self.env_num = len(envs)
         self.action_spaces = [worker.action_space for worker in self.workers]

@@ -1,11 +1,11 @@
 from typing import Any, Optional, Tuple, Union
-from magicrl.env.utils import gymnasium_step_type
 from multiprocessing import Process, Pipe, connection
 
 import gymnasium as gym
 import numpy as np
 
-from magicrl.env.worker.base import EnvWorker
+from magicrl.env.utils import gymnasium_step_type
+from magicrl.env.worker import BaseEnvWorker
 
 def _worker(conn_parent: connection.Connection, conn_child: connection.Connection, env:gym.Env):
     conn_parent.close()
@@ -35,7 +35,7 @@ def _worker(conn_parent: connection.Connection, conn_child: connection.Connectio
         conn_child.close()
 
 
-class SubprocEnvWorker(EnvWorker):
+class SubprocEnvWorker(BaseEnvWorker):
     def __init__(self, env: gym.Env) -> None:
         super().__init__(env)
         self.conn_parent, self.conn_child = Pipe()

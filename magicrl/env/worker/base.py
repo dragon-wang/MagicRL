@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Tuple, Union
-from magicrl.env.utils import gymnasium_step_type
+
 import gymnasium as gym
 import numpy as np
 
+from magicrl.env.utils import gymnasium_step_type
 
-class EnvWorker(ABC):
+class BaseEnvWorker(ABC):
     "The code is based on tianshou's worker (https://github.com/thu-ml/tianshou/tree/master/tianshou/env/worker)"
     def __init__(self, env: gym.Env) -> None:
         self.env = env

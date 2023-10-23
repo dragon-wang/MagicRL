@@ -1,12 +1,13 @@
 from typing import Any, Optional, Tuple, Union
-from magicrl.env.utils import gymnasium_step_type
+
 import gymnasium as gym
 import numpy as np
 
-from magicrl.env.worker.base import EnvWorker
+from magicrl.env.utils import gymnasium_step_type
+from magicrl.env.worker import BaseEnvWorker
 
 
-class DummyEnvWokrder(EnvWorker):
+class DummyEnvWokrder(BaseEnvWorker):
 
     def __init__(self, env: gym.Env) -> None:
         super().__init__(env)

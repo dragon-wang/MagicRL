@@ -1,8 +1,8 @@
 from abc import abstractmethod, ABC, ABCMeta
+from typing import Sequence, Type, Optional, List, Union, Dict, Tuple
+
 import torch
 import numpy as np
-from typing import Sequence, Type, Optional, List, Union, Dict, Tuple
-from magicrl.env.utils import venvs_step_type
 
 
 def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
