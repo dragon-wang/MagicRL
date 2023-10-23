@@ -25,7 +25,7 @@ q_net = MLPQsNet(obs_dim=obs_dim, act_num=act_num, hidden_size=[256, 256])
 
 agent = DQNAgent(q_net=q_net, device='cpu')
 
-replaybuffer = ReplayBuffer(buffer_size=5000, batch_size=128)
+replaybuffer = ReplayBuffer(buffer_size=5000)
 
 learner = OffPolicyLearner(explore_step=500,
                            learn_id="dqn_test",
@@ -33,6 +33,7 @@ learner = OffPolicyLearner(explore_step=500,
                            eval_env=eval_env,
                            agent=agent,
                            buffer=replaybuffer,
+                           batch_size=128,
                            max_train_step=10000,
                            learner_log_freq=500,
                            agent_log_freq=1000,

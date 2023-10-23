@@ -28,7 +28,7 @@ critic2 = MLPQsaNet(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
 
 agent = SACAgent(actor=actor, critic1=critic1, critic2=critic2, auto_alpha=True, device='cuda')
 
-replaybuffer = ReplayBuffer(buffer_size=1000000, batch_size=256)
+replaybuffer = ReplayBuffer(buffer_size=1000000)
 
 learner = OffPolicyLearner(explore_step=10000,
                            learn_id="sac_hopperh-v4_test",
@@ -36,6 +36,7 @@ learner = OffPolicyLearner(explore_step=10000,
                            eval_env=eval_env,
                            agent=agent,
                            buffer=replaybuffer,
+                           batch_size=256,
                            max_train_step=2000000,
                            learner_log_freq=1000,
                            agent_log_freq=5000,

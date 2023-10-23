@@ -28,14 +28,15 @@ critic2 = MLPQsaNet(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[400, 300])
 
 agent = TD3Agent(actor=actor, critic1=critic1, critic2=critic2, device='cuda')
 
-replaybuffer = ReplayBuffer(buffer_size=1000000, batch_size=100)
+replaybuffer = ReplayBuffer(buffer_size=1000000)
 
 learner = OffPolicyLearner(explore_step=10000,
-                           learn_id="td3_hopper-v4_123123",
+                           learn_id="td3_hopper-v4_12",
                            train_env=train_env,
                            eval_env=eval_env,
                            agent=agent,
                            buffer=replaybuffer,
+                           batch_size=100,
                            max_train_step=2000000,
                            learner_log_freq=1000,
                            agent_log_freq=5000,

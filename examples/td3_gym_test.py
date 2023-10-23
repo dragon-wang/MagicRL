@@ -28,7 +28,7 @@ critic2 = MLPQsaNet(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[400, 300])
 
 agent = TD3Agent(actor=actor, critic1=critic1, critic2=critic2, device='cuda')
 
-replaybuffer = ReplayBuffer(buffer_size=50000, batch_size=64)
+replaybuffer = ReplayBuffer(buffer_size=50000)
 
 learner = OffPolicyLearner(explore_step=500,
                            learn_id="td3_test_cuda",
@@ -36,6 +36,7 @@ learner = OffPolicyLearner(explore_step=500,
                            eval_env=eval_env,
                            agent=agent,
                            buffer=replaybuffer,
+                           batch_size=64,
                            max_train_step=100000,
                            learner_log_freq=1000,
                            agent_log_freq=5000,

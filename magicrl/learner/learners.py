@@ -44,10 +44,12 @@ class LearnerBase(ABC):
 class OffPolicyLearner(LearnerBase):
     def __init__(self,
                  explore_step,
+                 batch_size,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.explore_step = explore_step
+        self.batch_size = batch_size
     
     def learn(self):
         try:
@@ -78,7 +80,7 @@ class OffPolicyLearner(LearnerBase):
                 obs = next_obs
                 episode_length += 1
 
-                batch = self.buffer.sample(device=self.agent.device)
+                batch = self.buffer.sample(self.batch_size, device=self.agent.device)
                 train_summaries = self.agent.train(batch)
                 self.agent.train_step += 1
 

@@ -1,4 +1,5 @@
 from typing import Any, Optional, Tuple, Union, List
+from magicrl.env.utils import venvs_step_type
 import gymnasium as gym
 import numpy as np
 import torch
@@ -61,7 +62,7 @@ class BaseVectorEnv:
     
     
     def step(self, action: Union[np.ndarray, List[np.ndarray]], id: Optional[Union[int, List[int], np.ndarray]] = None
-             ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+             ) -> venvs_step_type:
         """Run one timestep of some environments' with id.
         """
         self._assert_is_not_closed()

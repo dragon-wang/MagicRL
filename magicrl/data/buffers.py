@@ -1,7 +1,8 @@
 from abc import abstractmethod, ABC, ABCMeta
 import torch
 import numpy as np
-from typing import Sequence, Type, Optional, List, Union, Dict
+from typing import Sequence, Type, Optional, List, Union, Dict, Tuple
+from magicrl.env.utils import venvs_step_type
 
 
 def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
@@ -129,6 +130,14 @@ def _to_tensor(data: Dict, device, dtype=torch.float32):
         else:
             _to_tensor(data[k], device)
 
+def _concat_batch(batch_list: Union[List[Dict], Tuple[Dict]]):
+    batches = {}
+    for k, v in batch_list[0].items():
+        if not isinstance(v, Dict):
+            batches[k] = np.concatenate([batch_list[i][k] for i in range(len(batch_list))])
+        else: 
+            batches[k] = _concat_batch([batch_list[i][k] for i in range(len(batch_list))])
+    return batches
 
 class BaseBuffer(ABC):
     def __init__(self, buffer_size):
@@ -153,11 +162,9 @@ class BaseBuffer(ABC):
         pass
 
 class ReplayBuffer(BaseBuffer):
-    def __init__(self, batch_size, **kwargs):
-        super().__init__(**kwargs)
-
-        self.batch_size = batch_size
-
+    def __init__(self, buffer_size: int):
+        super().__init__(buffer_size)
+        
         self._buffer = {}
         self._pointer = 0  # Point to the current position in the buffer
         self._current_size = 0  # The current size of the buffer
@@ -169,8 +176,8 @@ class ReplayBuffer(BaseBuffer):
         self._pointer = (self._pointer + 1) % self.buffer_size
         self._current_size = min(self._current_size + 1, self.buffer_size)
 
-    def sample(self, device=None, dtype=torch.float32):
-        indexes = np.random.choice(self._current_size, size=self.batch_size, replace=True)
+    def sample(self, batch_size, device=None, dtype=torch.float32):
+        indexes = np.random.choice(self._current_size, size=batch_size, replace=True)
         samples = _get_trans(self._buffer, indexes)
         if device is not None:
             _to_tensor(samples, device, dtype=dtype)
@@ -182,4 +189,35 @@ class ReplayBuffer(BaseBuffer):
 
     def load(self):
         # load from hdf5
+        pass
+
+class VectorBuffer(BaseBuffer):
+    def __init__(self, buffer_size: int, buffer_num: int, buffer_class: BaseBuffer):
+        super().__init__(buffer_size)  # The size of total buffer.
+        self.buffer_num = buffer_num
+        self.per_buffer_size = int(self.buffer_size / self.buffer_num)  # The size of each buffer in VectorBuffer.
+        self.buffer_list = [buffer_class(self.per_buffer_size) for _ in range(buffer_num)]
+
+    def add(self, transitions: List[Dict]) -> None:
+        assert (self.buffer_num == len(transitions)
+                ), "The num of envs is not equal to the num of buffers."
+        for i in range(self.buffer_num):
+            self.buffer_list[i].add(transitions[i])
+        self.current_size = sum([self.buffer_list[i]._current_size for i in range(self.buffer_num)])
+
+    def sample(self, batch_size, device=None, dtype=torch.float32) -> Dict:
+        buffer_indx = np.random.choice(self.buffer_num, batch_size, replace=True)
+        sample_nums = np.bincount(buffer_indx)
+        sample_list = []
+        for buffer_id, sample_num in enumerate(sample_nums):
+            sample_list.append(self.buffer_list[buffer_id].sample(sample_num))
+        samples = _concat_batch(sample_list)
+        if device is not None:
+            _to_tensor(samples, device, dtype=dtype)
+        return samples
+
+    def save(self):
+        pass
+
+    def load(self):
         pass
