@@ -1,11 +1,14 @@
 from abc import abstractmethod, ABC
+
 import torch
+import numpy as np
+
 from magicrl.utils.logger import LearnLogger, AgentLogger
-from magicrl.data.buffers import BaseBuffer
-from magicrl.agents.base import BaseAgent
+from magicrl.data import BaseBuffer
+from magicrl.agents import BaseAgent
 from magicrl.learner.exploration import explore_randomly, explore_by_agent
 from magicrl.learner.evaluation import evaluate_agent, infer_agent
-import numpy as np
+from magicrl.learner.collector import Collector
 
 class LearnerBase(ABC):
     def __init__(self, 
@@ -31,6 +34,8 @@ class LearnerBase(ABC):
         self.eval_freq = eval_freq
         self.resume = resume
 
+        self.train_collector = Collector(self.train_env, self.agent, self.buffer)
+
     @abstractmethod
     def learn(self):
         pass  
@@ -50,51 +55,32 @@ class OffPolicyLearner(LearnerBase):
 
         self.explore_step = explore_step
         self.batch_size = batch_size
-    
+
     def learn(self):
         try:
             learner_logger = LearnLogger(self.learn_id, self.resume)
             agent_logger = AgentLogger(self.learn_id ,self.resume)
             if self.resume:
                 agent_logger.load_agent(self.agent, -1)
-                explore_by_agent(self.train_env, self.agent, self.buffer, self.explore_step)
+                self.train_collector.collect(n_step=self.explore_step, is_explore=True, random=False)
             else:
-                explore_randomly(self.train_env, self.buffer, self.explore_step)
-            print("==============================start train===================================")
-            obs, _ = self.train_env.reset()
-            episode_reward = 0
-            episode_length = 0
+                self.train_collector.collect(n_step=self.explore_step, is_explore=True, random=True)
 
+            print("==============================start train===================================")
             # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
             while self.agent.train_step < self.max_train_step:
-                act = self.agent.select_action(np.array(obs), eval=False)
-                next_obs, rew, terminated, truncated, info = self.train_env.step(act)
-                done = np.logical_or(terminated, truncated)
-                episode_reward += rew
-                transition = {"obs": obs,
-                            "act": act,
-                            "rew": rew,
-                            "next_obs": next_obs,
-                            "done": done}
-                self.buffer.add(transition)
-                obs = next_obs
-                episode_length += 1
 
+                # collect data by interacting with the environment.
+                self.train_collector.collect(n_step=1)
+
+                # sample data from the buffer.
                 batch = self.buffer.sample(self.batch_size, device=self.agent.device)
+
+                # train agent with the sampled data.
                 train_summaries = self.agent.train(batch)
                 self.agent.train_step += 1
 
-                if done:
-                    self.agent.train_episode += 1
-                    obs, _ = self.train_env.reset()
-                
-                    print(f"Time Step: {self.agent.train_step} Episode Num: {self.agent.train_episode}"
-                        f"Episode Length: {episode_length} Episode Reward: {episode_reward:.2f}")
-                    learner_logger.log_train_data({"episode_length": episode_length,
-                                                        "episode_reward": episode_reward}, self.agent.train_step)
-                    episode_reward = 0
-                    episode_length = 0
-
+                # log train and evaluation data.
                 if self.agent.train_step % self.learner_log_freq == 0:
                     learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
