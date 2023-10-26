@@ -6,11 +6,9 @@ import numpy as np
 from magicrl.utils.logger import LearnLogger, AgentLogger
 from magicrl.data import BaseBuffer
 from magicrl.agents import BaseAgent
-from magicrl.learner.exploration import explore_randomly, explore_by_agent
-from magicrl.learner.evaluation import evaluate_agent, infer_agent
-from magicrl.learner.collector import Collector
+from magicrl.learner.interactor import Collector, Evaluator
 
-class LearnerBase(ABC):
+class BaseLearner(ABC):
     def __init__(self, 
                  learn_id,  # The name and path to save model and log tensorboard
                  train_env,  # The the environmrnt for train.
@@ -34,19 +32,15 @@ class LearnerBase(ABC):
         self.eval_freq = eval_freq
         self.resume = resume
 
-        self.train_collector = Collector(self.train_env, self.agent, self.buffer)
+        self.collector = Collector(self.train_env, self.agent, self.buffer)
+        self.evaluator = Evaluator(self.eval_env, self.agent)
 
     @abstractmethod
     def learn(self):
         pass  
 
-    def inference(self, infer_env, episode_num):
-        agent_logger = AgentLogger(self.learn_id ,True)
-        agent_logger.load_agent(self.agent, -1)
-        infer_agent(infer_env, self.agent, episode_num=episode_num)
 
-
-class OffPolicyLearner(LearnerBase):
+class OffPolicyLearner(BaseLearner):
     def __init__(self,
                  explore_step,
                  batch_size,
@@ -62,16 +56,16 @@ class OffPolicyLearner(LearnerBase):
             agent_logger = AgentLogger(self.learn_id ,self.resume)
             if self.resume:
                 agent_logger.load_agent(self.agent, -1)
-                self.train_collector.collect(n_step=self.explore_step, is_explore=True, random=False)
+                self.collector.collect(n_step=self.explore_step, is_explore=True, random=False)
             else:
-                self.train_collector.collect(n_step=self.explore_step, is_explore=True, random=True)
+                self.collector.collect(n_step=self.explore_step, is_explore=True, random=True)
 
             print("==============================start train===================================")
             # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
             while self.agent.train_step < self.max_train_step:
 
                 # collect data by interacting with the environment.
-                self.train_collector.collect(n_step=1)
+                self.collector.collect(n_step=1)
 
                 # sample data from the buffer.
                 batch = self.buffer.sample(self.batch_size, device=self.agent.device)
@@ -80,15 +74,16 @@ class OffPolicyLearner(LearnerBase):
                 train_summaries = self.agent.train(batch)
                 self.agent.train_step += 1
 
-                # log train and evaluation data.
+                # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
                     learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
+                # log evaluate data.
                 if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
-                    evaluate_summaries = evaluate_agent(self.eval_env, self.agent, episode_num=10)
-                    print(evaluate_summaries)
+                    evaluate_summaries = self.evaluator.evaluate()
                     learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
                 
+                # log trained agent.
                 if self.agent.train_step % self.agent_log_freq == 0:
                     agent_logger.log_agent(self.agent, self.agent.train_step)
 

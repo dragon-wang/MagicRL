@@ -4,14 +4,20 @@ import gymnasium as gym
 import numpy as np
 
 from magicrl.agents import BaseAgent
+from magicrl.utils.logger import AgentLogger
 
 
 class Inferrer:
-    def __init__(self, env: gym.Env, agent: BaseAgent) -> None:
+    def __init__(self, env: gym.Env, agent: BaseAgent, learn_id: str) -> None:
         self.env = env
         self.agent = agent
+        self.learn_id = learn_id
 
-    def infer(self, episode_num: int) -> None:
+
+    def infer(self, episode_num=5, checkpoint_step=-1) -> None:
+        agent_logger = AgentLogger(self.learn_id ,True)
+        agent_logger.load_agent(self.agent, checkpoint_step)
+
         total_reward = 0
         total_length = 0
 
@@ -29,7 +35,7 @@ class Inferrer:
                 if done:
                     total_reward += episode_reward
                     total_length += episode_length
-                    print("[episode_id:{}], length:{}, reward:{:.2f}]".format(i, episode_length, episode_reward))
+                    print("[episode_id:{}], length:{}, reward:{:.2f}]".format(i+1, episode_length, episode_reward))
 
         avg_reward = total_reward / episode_num
         avg_length = total_length / episode_num
