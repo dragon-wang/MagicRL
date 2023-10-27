@@ -9,7 +9,7 @@ from magicrl.agents.modelfree import DQNAgent
 from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.discrete import MLPQsNet
+from magicrl.nn import QNet
 from magicrl.env.maker import make_gym_env
 
 
@@ -18,7 +18,7 @@ if __name__ == '__main__':
     seed = 10
     train_env_num = 10
     eval_env_num = 5
-    learn_id = "new/dqn_cartpole-v4"
+    learn_id = "test/dqn_cartpole-v4"
     env_name = "CartPole-v1"
 
     torch.manual_seed(seed)
@@ -34,8 +34,7 @@ if __name__ == '__main__':
     obs_dim = env.observation_space.shape[0]
     act_num = env.action_space.n
 
-    q_net = MLPQsNet(obs_dim=obs_dim, act_num=act_num, hidden_size=[256, 256])
-
+    q_net = QNet(obs_dim=obs_dim, act_num=act_num, hidden_size=[256, 256])
     agent = DQNAgent(q_net=q_net, device='cpu')
 
     # replaybuffer = ReplayBuffer(buffer_size=5000)
@@ -54,8 +53,8 @@ if __name__ == '__main__':
                             eval_freq=1000,
                             resume=False)
 
-    # learner.learn()
+    learner.learn()
     # 
-    infer_env = gym.make("CartPole-v1", render_mode='human')
-    inferrer = Inferrer(env=infer_env, agent=agent, learn_id=learn_id)
-    inferrer.infer()
+    # infer_env = gym.make("CartPole-v1", render_mode='human')
+    # inferrer = Inferrer(env=infer_env, agent=agent, learn_id=learn_id)
+    # inferrer.infer()

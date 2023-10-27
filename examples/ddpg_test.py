@@ -9,7 +9,7 @@ from magicrl.agents.modelfree.ddpg import DDPGAgent
 from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.continuous import MLPQsaNet, DDPGMLPActor
+from magicrl.nn import SimpleActor, SimpleCritic
 from magicrl.env.maker import make_gym_env
 
 
@@ -34,9 +34,8 @@ if __name__ == '__main__':
     act_dim = env.action_space.shape[0]
     act_bound = env.action_space.high[0]
 
-    actor = DDPGMLPActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[400, 300])
-
-    critic = MLPQsaNet(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[400, 300])
+    actor = SimpleActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[400, 300])
+    critic = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[400, 300])
 
     agent = DDPGAgent(actor=actor, critic=critic, device='cuda')
 

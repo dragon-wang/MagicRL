@@ -1,98 +1,134 @@
-import torch
+from typing import Sequence, Type, Optional, List, Union
+
 import numpy as np
+import torch
 from torch import nn
 import torch.nn.functional as F
-from typing import Sequence, Type, Optional, List, Union
 from torch.distributions.normal import Normal
 from torch.distributions.categorical import Categorical
-from magicrl.nn.common import MLP
 
+from magicrl.nn import MLP
+from magicrl.nn import BaseFeatureNet
 
-class MLPQsaNet(nn.Module):
-    """
-    DDPG Critic, SAC Q net, BCQ Critic
-    Input (s,a), output Q(s,a)
-    """
-    def __init__(self, obs_dim, act_dim, hidden_size, hidden_activation=nn.ReLU):
-        super(MLPQsaNet, self).__init__()
-        self.mlp = MLP(input_dim=obs_dim + act_dim,
-                       output_dim=1,
-                       hidden_size=hidden_size,
-                       hidden_activation=hidden_activation)
-
-    def forward(self, obs, act):
-        x = torch.cat([obs, act], dim=1)
-        q = self.mlp(x)
-        return q
-
-
-class DDPGMLPActor(nn.Module):
-    """
-    DDPG Actor
-    """
-    def __init__(self, obs_dim, act_dim, act_bound, hidden_size, hidden_activation=nn.ReLU):
-        super(DDPGMLPActor, self).__init__()
-        self.mlp = MLP(input_dim=obs_dim, output_dim=act_dim,
-                       hidden_size=hidden_size, hidden_activation=hidden_activation)
-        self.act_bound = act_bound
-        self.act_dim = act_dim
-
-    def forward(self, obs):
-        a = torch.tanh(self.mlp(obs))
-        a = self.act_bound * a
-        return a
-    
 
 LOG_STD_MIN = -20
 LOG_STD_MAX = 2
 
 
-class MLPSquashedReparamGaussianPolicy(nn.Module):
+class SimpleActor(nn.Module):
+    """SimpleActor used in DDPG, TD3.
     """
-    Policy net. Used in SAC, CQL, BEAR.
-    Input s, output reparameterized, squashed action and log probability of this action
+    def __init__(self, 
+                 obs_dim: Union[int, list, np.ndarray], 
+                 act_dim: int, 
+                 act_bound: float, 
+                 hidden_size: List[int], 
+                 hidden_activation=nn.ReLU,
+                 feature_net: BaseFeatureNet=None) -> None:
+        super().__init__()
+        
+        feature_dim = obs_dim if feature_net is None else feature_net.feature_dim
+
+        self.mlp = MLP(input_dim=feature_dim, output_dim=act_dim, hidden_size=hidden_size,
+                       hidden_activation=hidden_activation)
+        
+        self.feature_net = feature_net
+
+        self.act_bound = act_bound
+        self.act_dim = act_dim
+
+    def forward(self, obs: Union[np.ndarray, torch.Tensor]):
+        act = self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
+        act = self.act_bound * torch.tanh(act)
+        
+        return act
+    
+class SimpleCritic(nn.Module):
+    """SimpleCritic used in DDPG, TD3, SAC, PPO.
     """
-    def __init__(self, obs_dim, act_dim, act_bound, hidden_size, hidden_activation=nn.ReLU, edge=3e-3):
+    def __init__(self, 
+                 obs_dim: Union[int, list, np.ndarray], 
+                 act_dim: int = 0, 
+                 hidden_size: List[int] = [], 
+                 hidden_activation = nn.ReLU,
+                 feature_net: BaseFeatureNet = None) -> None:
+        super().__init__()
 
-        super(MLPSquashedReparamGaussianPolicy, self).__init__()
+        feature_dim = obs_dim if feature_net is None else feature_net.feature_dim
 
-        self.mlp = MLP(input_dim=obs_dim, output_dim=hidden_size[-1], hidden_size=hidden_size[:-1],
+        self.mlp = MLP(input_dim=feature_dim + act_dim, 
+                       output_dim=1, 
+                       hidden_size=hidden_size,
+                       hidden_activation=hidden_activation)
+        
+        self.feature_net = feature_net
+
+    def forward(self, 
+                obs: Union[np.ndarray, torch.Tensor], 
+                act: Union[np.ndarray, torch.Tensor, None] = None):
+        
+        feature = obs if self.feature_net is None else self.feature_net(obs)
+
+        if act is not None:
+            feature = torch.cat([feature, act], dim=1)
+            
+        q = self.mlp(feature)
+
+        return q
+        
+
+class RepapamGaussionActor(nn.Module):
+    def __init__(self, 
+                 obs_dim: Union[int, list, np.ndarray], 
+                 act_dim: int, 
+                 act_bound: float, 
+                 hidden_size: List[int], 
+                 hidden_activation=nn.ReLU,
+                 feature_net: BaseFeatureNet=None) -> None:
+        super().__init__()
+        
+        feature_dim = obs_dim if feature_net is None else feature_net.feature_dim
+
+        self.mlp = MLP(input_dim=feature_dim, output_dim=hidden_size[-1], hidden_size=hidden_size[:-1],
                        hidden_activation=hidden_activation, output_activation=hidden_activation)
+        
         self.fc_mu = nn.Linear(hidden_size[-1], act_dim)
         self.fc_log_std = nn.Linear(hidden_size[-1], act_dim)
+        
+        self.feature_net = feature_net
 
-        # self.fc_mu.weight.data.uniform_(-edge, edge)
-        # self.fc_log_std.bias.data.uniform_(-edge, edge)
-
-        self.hidden_activation = hidden_activation
-
-        self.act_dim = act_dim
         self.act_bound = act_bound
+        self.act_dim = act_dim
+
+        self._eps = np.finfo(np.float32).eps.item()
 
     def forward(self, obs):
-        x = self.mlp(obs)
+        x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
 
         mu = self.fc_mu(x)
         log_std = self.fc_log_std(x).clamp(LOG_STD_MIN, LOG_STD_MAX)
         std = torch.exp(log_std)
 
         dist = Normal(mu, std)
-        u = dist.rsample()
-        a = torch.tanh(u)
+        raw_act = dist.rsample()
+        squashed_act = torch.tanh(raw_act)
 
-        action = self.act_bound * a
-        log_prob = torch.sum(dist.log_prob(u) - torch.log(1 - a.pow(2) + 1e-6), dim=1)
-        mu_action = self.act_bound * torch.tanh(mu)  # used in evaluation
+        act = self.act_bound * squashed_act
+        log_prob = torch.sum(dist.log_prob(raw_act) - torch.log(1 - squashed_act.pow(2) + self._eps), dim=1)
 
-        return action, log_prob, mu_action
+        mu_act = self.act_bound * torch.tanh(mu)  # used in evaluation and inference.
+
+        return act, log_prob, mu_act
 
     def sample_multiple_without_squash(self, obs, sample_num):
-        x = self.mlp(obs)
+        x =  self.mlp(obs) if self.feature_net is  None else self.mlp(self.feature_net(obs))
+
         mu = self.fc_mu(x)
         log_std = self.fc_log_std(x).clamp(LOG_STD_MIN, LOG_STD_MAX)
         std = torch.exp(log_std)
 
         dist = Normal(mu, std)
-        raw_action = dist.rsample((sample_num, ))
+        raw_act = dist.rsample((sample_num, ))
 
-        return raw_action.transpose(0, 1)  # N x B X D -> B x N x D (N:sample num, B:batch size, D:action dim)
+        return raw_act.transpose(0, 1)  # N x B X D -> B x N x D (N:sample num, B:batch size, D:action dim)
+
