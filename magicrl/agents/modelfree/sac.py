@@ -53,13 +53,13 @@ class SACAgent(BaseAgent):
 
     def select_action(self, obs, eval=False):
         with torch.no_grad():
-            obs = torch.FloatTensor(obs).reshape(1, -1).to(self.device)
+            obs = torch.FloatTensor(obs).to(self.device)
             action, log_prob, mu_action = self.actor(obs)
 
             if eval:
                 action = mu_action  # if eval, use mu as the action
 
-        return action.cpu().numpy().flatten()
+        return action.cpu().numpy()
 
     def train(self, batch):
 

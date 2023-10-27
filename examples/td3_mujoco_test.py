@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import gymnasium as gym
 
-from magicrl.agents.modelfree.td3 import TD3Agent
+from magicrl.agents.modelfree import TD3Agent
 from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
     seed = 10
     train_env_num = 10
-    eval_env_num = 10
+    eval_env_num = 5
     learn_id = "new/td3_hopper-v4"
     env_name = "Hopper-v4"
 
@@ -51,14 +51,14 @@ if __name__ == '__main__':
                             agent=agent,
                             buffer=replaybuffer,
                             batch_size=100,
-                            max_train_step=2000000,
+                            max_train_step=1000000,
                             learner_log_freq=1000,
-                            agent_log_freq=5000,
+                            agent_log_freq=100000,
                             eval_freq=5000,
                             resume=False)
 
-    learner.learn()
+    # learner.learn()
 
-    # infer_env = gym.make("Hopper-v4", render_mode='human')
-    # inferrer = Inferrer(env=infer_env, agent=agent, learn_id=learn_id)
-    # inferrer.infer()
+    infer_env = gym.make("Hopper-v4", render_mode='human')
+    inferrer = Inferrer(env=infer_env, agent=agent, learn_id=learn_id)
+    inferrer.infer()

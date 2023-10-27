@@ -40,14 +40,14 @@ class DDPGAgent(BaseAgent):
 
 
     def select_action(self, obs, eval=False):
-        obs = torch.FloatTensor(obs).reshape(1, -1).to(self.device)
+        obs = torch.FloatTensor(obs).to(self.device)
 
         with torch.no_grad():
-            action = self.actor(obs).cpu().numpy().flatten()
+            action = self.actor(obs).cpu().numpy()
         if eval:
             return action
         else:
-            noise = np.random.normal(0, self.exploration_noise, size=self.act_dim)
+            noise = np.random.normal(0, self.exploration_noise, size=action.shape)
             return (action + noise).clip(-self.act_bound, self.act_bound)
 
     def train(self, batch):

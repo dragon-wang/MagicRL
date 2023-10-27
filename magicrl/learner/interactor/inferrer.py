@@ -27,8 +27,8 @@ class Inferrer:
             obs, _ = self.env.reset()
             done = False
             while not done:
-                action = self.agent.select_action(obs, eval=True)
-                obs, reward, terminated, truncated, _ = self.env.step(action)
+                action = self.agent.select_action(np.array([obs]), eval=True)
+                obs, reward, terminated, truncated, _ = self.env.step(action.squeeze(0))
                 done = np.logical_or(terminated, truncated)
                 episode_reward += reward
                 episode_length += 1
