@@ -7,8 +7,8 @@ import torch.nn.functional as F
 from torch.distributions.normal import Normal
 from torch.distributions.categorical import Categorical
 
-from magicrl.nn import MLP
-from magicrl.nn import BaseFeatureNet
+from magicrl.nn.common import MLP
+from magicrl.nn.feature import BaseFeatureNet
 
 
 LOG_STD_MIN = -20

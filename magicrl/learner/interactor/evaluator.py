@@ -45,8 +45,8 @@ class Evaluator:
                               'min_reward': min_reward,
                               'avg_length': avg_length}
         
-        print(f'Evaluate at train step {self.agent.train_step}: ', 
-              f'Rewards of {self.env_num} envs: {np.round(episode_rewards, 1)} ',
+        print(f'Evaluate at step {self.agent.train_step} in {self.env_num} envs: ', 
+              f'{np.round(episode_rewards, 1)} ',
               f'avergae length: {avg_length:.1f}, average reward: {avg_reward:.1f}')
 
         return evaluate_summaries

@@ -5,7 +5,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from magicrl.nn import MLP, BaseFeatureNet
+from magicrl.nn.common import MLP
+from magicrl.nn.feature import BaseFeatureNet
 
 
 class QNet(nn.Module):

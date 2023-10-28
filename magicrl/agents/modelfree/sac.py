@@ -18,6 +18,7 @@ class SACAgent(BaseAgent):
                  critic2: torch.nn.Module,
                  actor_lr=3e-4,
                  critic_lr=3e-4,
+                 alpha_lr=3e-4,
                  tau=0.05,
                  alpha=0.5,
                  auto_alpha=False,
@@ -47,7 +48,7 @@ class SACAgent(BaseAgent):
         if self.auto_alpha:
             self.target_entropy = -self.act_dim
             self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
-            self.alpha_optim = torch.optim.Adam([self.log_alpha], lr=actor_lr)
+            self.alpha_optim = torch.optim.Adam([self.log_alpha], lr=alpha_lr)
             self.alpha = torch.exp(self.log_alpha)
             self.attr_names.extend(['log_alpha', 'alpha_optim'])
 

@@ -45,7 +45,7 @@ class DQNAgent(BaseAgent):
         if np.random.uniform(0, 1) > eps:
             with torch.no_grad():
                 obs = torch.FloatTensor(obs).to(self.device)
-                return self.q_net(obs).argmax(dim=1).numpy()
+                return self.q_net(obs).argmax(dim=1).cpu().numpy()
         else:
             act = np.random.randint(0, self.act_num, size=obs.shape[0])
             return act
