@@ -44,11 +44,13 @@ class OffPolicyLearner(BaseLearner):
     def __init__(self,
                  explore_step,
                  batch_size,
+                 collect_per_step=1,  # How many transitions the agent collect in every step.
                  **kwargs):
         super().__init__(**kwargs)
 
         self.explore_step = explore_step
         self.batch_size = batch_size
+        self.collect_per_step = collect_per_step
 
     def learn(self):
         try:
@@ -65,7 +67,7 @@ class OffPolicyLearner(BaseLearner):
             while self.agent.train_step < self.max_train_step:
 
                 # collect data by interacting with the environment.
-                self.collector.collect(n_step=1)
+                self.collector.collect(n_step=self.collect_per_step)
 
                 # sample data from the buffer.
                 batch = self.buffer.sample(self.batch_size, device=self.agent.device)
