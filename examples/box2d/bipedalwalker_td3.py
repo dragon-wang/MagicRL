@@ -11,7 +11,7 @@ from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
 from magicrl.nn.continuous import SimpleActor, SimpleCritic
-from magicrl.env.maker import make_gym_env
+from magicrl.env.maker import make_gym_env, get_gym_space
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -34,15 +34,20 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    env, train_envs, eval_envs = make_gym_env(env_name=args.env,
-                                              train_env_num=args.train_num,
-                                              eval_env_num=args.eval_num,
-                                              seed=args.seed,
-                                              dummy=False)
+    observation_space, action_space = get_gym_space(args.env)
 
-    obs_dim = env.observation_space.shape[0]
-    act_dim = env.action_space.shape[0]
-    act_bound = env.action_space.high[0]
+    # 1.Make Learner and Inferrer.
+    if not args.infer:
+        train_envs, eval_envs = make_gym_env(env_name=args.env,
+                                             train_env_num=args.train_num,
+                                             eval_env_num=args.eval_num,
+                                             seed=args.seed,
+                                             dummy=False)
+        
+    # 2.Make agent.
+    obs_dim = observation_space.shape[0]
+    act_dim = action_space.shape[0]
+    act_bound = action_space.high[0]
 
     actor = SimpleActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
     critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
@@ -60,6 +65,7 @@ if __name__ == '__main__':
                      policy_delay=2,
                      device=args.device)
 
+    # 3.Make Learner and Inferrer.
     if not args.infer:
         if args.train_num == 1:
             replaybuffer = ReplayBuffer(buffer_size=args.buffer_size)

@@ -5,7 +5,6 @@ from magicrl.env import SubprocVectorEnv, DummyVectorEnv
 
 
 def make_atari_env(env_name, train_env_num, eval_env_num, seed, dummy=False, **kwargs):
-    env = gym.make(env_name)
 
     VectorEnv = DummyVectorEnv if dummy else SubprocVectorEnv
 
@@ -18,4 +17,11 @@ def make_atari_env(env_name, train_env_num, eval_env_num, seed, dummy=False, **k
     train_envs.seed(seed)
     eval_envs.seed(seed)
 
-    return env, train_envs, eval_envs
+    return train_envs, eval_envs
+
+def get_atari_space(env_name):
+    env = wrap_deepmind(env_name=env_name)
+    observation_space = env.observation_space
+    action_space = env.action_space
+    env.close()
+    return observation_space, action_space

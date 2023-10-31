@@ -11,7 +11,8 @@ from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
 from magicrl.nn.discrete import QNet
-from magicrl.env.maker import make_gym_env
+from magicrl.env.maker import make_gym_env, get_gym_space
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -34,14 +35,18 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    env, train_envs, eval_envs = make_gym_env(env_name=args.env,
-                                              train_env_num=args.train_num,
-                                              eval_env_num=args.eval_num,
-                                              seed=args.seed,
-                                              dummy=False)
+    observation_space, action_space = get_gym_space(args.env)
 
-    obs_dim = env.observation_space.shape[0]
-    act_num = env.action_space.n
+    # 1.Make Learner and Inferrer.
+    if not args.infer:
+        train_envs, eval_envs = make_gym_env(env_name=args.env,
+                                             train_env_num=args.train_num,
+                                             eval_env_num=args.eval_num,
+                                             seed=args.seed,
+                                             dummy=False)
+
+    obs_dim = observation_space.shape[0]
+    act_num = action_space.n
 
     q_net = QNet(obs_dim=obs_dim, act_num=act_num, hidden_size=[256, 256])
     agent = DQNAgent(q_net=q_net,
@@ -52,7 +57,8 @@ if __name__ == '__main__':
                      eval_eps=0.01,
                      target_update_freq=100,
                      device=args.device)
-
+    
+    # 3.Make Learner and Inferrer.
     if not args.infer:
         if args.train_num == 1:
             replaybuffer = ReplayBuffer(buffer_size=args.buffer_size)

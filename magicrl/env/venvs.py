@@ -14,6 +14,7 @@ class BaseVectorEnv:
         self.workers = [worker_class(env) for env in envs]
         self.env_num = len(envs)
         self.action_spaces = [worker.action_space for worker in self.workers]
+        self.observation_spaces = [worker.observation_space for worker in self.workers]
         self.is_closed = False
 
     def _assert_is_not_closed(self) -> None:

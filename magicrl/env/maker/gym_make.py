@@ -1,10 +1,9 @@
 import gymnasium as gym
+
 from magicrl.env import SubprocVectorEnv, DummyVectorEnv
 
 
 def make_gym_env(env_name, train_env_num, eval_env_num, seed, dummy=False):
-    
-    env = gym.make(env_name)
     
     VectorEnv = DummyVectorEnv if dummy else SubprocVectorEnv
 
@@ -14,5 +13,14 @@ def make_gym_env(env_name, train_env_num, eval_env_num, seed, dummy=False):
     train_envs.seed(seed)
     eval_envs.seed(seed)
 
-    return env, train_envs, eval_envs
-    
+    space = (train_envs.observation_spaces[0], train_envs.action_spaces[0])
+
+    return train_envs, eval_envs, space
+
+
+def get_gym_space(env_name):
+    env = gym.make(env_name)
+    observation_space = env.observation_space
+    action_space = env.action_space
+    env.close()
+    return observation_space, action_space
