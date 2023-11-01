@@ -13,9 +13,7 @@ def make_gym_env(env_name, train_env_num, eval_env_num, seed, dummy=False):
     train_envs.seed(seed)
     eval_envs.seed(seed)
 
-    space = (train_envs.observation_spaces[0], train_envs.action_spaces[0])
-
-    return train_envs, eval_envs, space
+    return train_envs, eval_envs
 
 
 def get_gym_space(env_name):
