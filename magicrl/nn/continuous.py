@@ -5,7 +5,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.distributions.normal import Normal
-from torch.distributions.categorical import Categorical
 
 from magicrl.nn.common import MLP
 from magicrl.nn.feature import BaseFeatureNet
@@ -132,3 +131,50 @@ class RepapamGaussionActor(nn.Module):
 
         return raw_act.transpose(0, 1)  # N x B X D -> B x N x D (N:sample num, B:batch size, D:action dim)
 
+
+class GaussionActor(nn.Module):
+    def __init__(self, 
+                 obs_dim: Union[int, list, np.ndarray], 
+                 act_dim: int, 
+                 act_bound: float, 
+                 hidden_size: List[int], 
+                 hidden_activation=nn.Tanh,
+                 feature_net: BaseFeatureNet=None) -> None:
+        super().__init__()
+        
+        feature_dim = obs_dim if feature_net is None else feature_net.feature_dim
+
+        self.mlp = MLP(input_dim=feature_dim, output_dim=hidden_size[-1], hidden_size=hidden_size[:-1],
+                       hidden_activation=hidden_activation, output_activation=hidden_activation)
+        
+        self.fc_mu = nn.Linear(hidden_size[-1], act_dim)
+        self.log_std = nn.Parameter(torch.zeros(1, act_dim), requires_grad=True)
+        
+        self.feature_net = feature_net
+
+        self.act_bound = act_bound
+        self.act_dim = act_dim
+
+
+    def forward(self, obs):
+        x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
+
+        mu = self.fc_mu(x)
+        std = torch.exp(self.log_std)
+        dist = Normal(mu, std)
+
+        act = dist.sample().clip(-self.act_bound, self.act_bound)
+        mu_act = mu.clip(-self.act_bound, self.act_bound)
+
+        return act, mu_act
+    
+    def get_log_prob(self, obs, act):
+        x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
+
+        mu = self.fc_mu(x)
+        std = torch.exp(self.log_std)
+        dist = Normal(mu, std)
+
+        log_prob = dist.log_prob(act).sum(1)
+
+        return log_prob  # act: (n, m), log_prob: (n, )

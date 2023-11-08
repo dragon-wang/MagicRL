@@ -65,6 +65,8 @@ class BaseVectorEnv:
     def step(self, action: Union[np.ndarray, List[np.ndarray]], id: Optional[Union[int, List[int], np.ndarray]] = None
              ) -> venvs_step_type:
         """Run one timestep of some environments' with id.
+        The dimension of the action here must be like (1, n) or (m, n).
+        So the 'select_action()' function in agent must retrun the action of (1, n).
         """
         self._assert_is_not_closed()
         id = self._wrap_id(id)

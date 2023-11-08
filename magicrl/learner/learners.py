@@ -74,7 +74,7 @@ class OffPolicyLearner(BaseLearner):
 
                 # train agent with the sampled data.
                 train_summaries = self.agent.train(batch)
-                self.agent.train_step += 1
+                self.agent.train_step += 1  # the meaning of 'train_step' here is the same as 'time_step'.
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
@@ -92,4 +92,56 @@ class OffPolicyLearner(BaseLearner):
         except KeyboardInterrupt:
             print("Saving agent.......")
             agent_logger.log_agent(self.agent, self.agent.train_step)
-            
+
+
+class OnPolicyLearner(BaseLearner):
+    def __init__(self,
+                 trajectory_length=128,
+                 **kwargs):
+        super().__init__(**kwargs)
+
+        self.trajectory_length = trajectory_length
+
+    def learn(self):
+        try:
+            learner_logger = LearnLogger(self.learn_id, self.resume)
+            agent_logger = AgentLogger(self.learn_id ,self.resume)
+            if self.resume:
+                agent_logger.load_agent(self.agent, -1)
+
+            print("==============================start train===================================")
+            # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
+            t_length = 0
+            while self.agent.train_step < self.max_train_step:
+
+                # collect data by interacting with the environment.
+                self.collector.collect(n_step=1)
+                t_length += 1
+
+                if t_length == self.trajectory_length:
+                    # sample data from the buffer and clear the buffer.
+                    batch = self.buffer.sample(device=self.agent.device)
+                    # train agent with the sampled data.
+                    train_summaries = self.agent.train(batch)
+
+                    self.buffer.clear()
+                    t_length = 0
+
+                self.agent.train_step += 1  # the meaning of 'train_step' here is the same as 'time_step'.
+
+                # log train data.
+                if self.agent.train_step % self.learner_log_freq == 0:
+                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+
+                # log evaluate data.
+                if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
+                    evaluate_summaries = self.evaluator.evaluate()
+                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                
+                # log trained agent.
+                if self.agent.train_step % self.agent_log_freq == 0:
+                    agent_logger.log_agent(self.agent, self.agent.train_step)
+
+        except KeyboardInterrupt:
+            print("Saving agent.......")
+            agent_logger.log_agent(self.agent, self.agent.train_step)

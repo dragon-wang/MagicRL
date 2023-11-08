@@ -18,7 +18,7 @@ class BaseAgent(ABC):
     @abstractmethod
     def select_action(self, obs, eval=False):
         """Select an action according to the observation
-
+        The return action's dim must be (1, n) in continuous env; and (1, ) in discrete env.
         Args:
             obs (_type_): The observation
             eval (bool): Whether used in evaluation

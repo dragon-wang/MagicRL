@@ -191,6 +191,39 @@ class ReplayBuffer(BaseBuffer):
         # load from hdf5
         pass
 
+class TrajectoryBuffer(BaseBuffer):
+    def __init__(self, buffer_size: int):
+        super().__init__(buffer_size)
+        
+        self._buffer = {}
+        self._pointer = 0  # Point to the current position in the buffer
+
+    def add(self, transition: Dict):
+        if not self._buffer:
+            _build_buffer(self._buffer, transition, self.buffer_size)
+        _add_tran(self._buffer, transition, index=self._pointer)
+        self._pointer += 1
+    
+    def sample(self, device=None, dtype=torch.float32):
+        assert (self._pointer == self.buffer_size
+                ), f"The buffer is not full. The expected size is {self.buffer_size}, but now is {self._pointer}"
+        
+        if device is not None:
+            _to_tensor(self._buffer, device, dtype=dtype)
+        return self._buffer
+    
+    def clear(self):
+        self._buffer.clear()
+        self._pointer = 0
+    
+    def save(self):
+        # save to hdf5
+        pass
+
+    def load(self):
+        # load from hdf5
+        pass
+
 class VectorBuffer(BaseBuffer):
     def __init__(self, buffer_size: int, buffer_num: int, buffer_class: BaseBuffer):
         super().__init__(buffer_size)  # The size of total buffer.
