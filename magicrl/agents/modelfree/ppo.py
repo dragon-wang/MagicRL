@@ -21,8 +21,12 @@ class PPO_Agent(BaseAgent):
                  gae_lambda=0.95,
                  gae_normalize=False,
                  clip_pram=0.2,
+                 ent_coef=0.01,
+                 use_grad_clip=False,
+                 use_lr_decay=False,
                  train_actor_iters=10,
                  train_critic_iters=10,
+                 max_train_step=None,
                  **kwargs
                  ):
         super().__init__(**kwargs)
@@ -33,11 +37,17 @@ class PPO_Agent(BaseAgent):
         self.actor_optim = torch.optim.Adam(self.actor.parameters(), lr=actor_lr)
         self.critic_optim = torch.optim.Adam(self.critic.parameters(), lr=critic_lr)
 
+        self.actor_lr = actor_lr
+        self.critic_lr = critic_lr
         self.gae_lambda = gae_lambda
         self.gae_normalize = gae_normalize
         self.clip_pram = clip_pram
+        self.ent_coef = ent_coef
+        self.use_grad_clip = use_grad_clip
+        self.use_lr_decay  = use_lr_decay
         self.train_actor_iters = train_actor_iters
         self.train_critic_iters = train_critic_iters
+        self.max_train_step = max_train_step
 
         self.attr_names.extend(['actor','critic', 'actor_optim', 'critic_optim'])
 
@@ -65,7 +75,14 @@ class PPO_Agent(BaseAgent):
             gae_advs = (gae_advs - torch.mean(gae_advs) / torch.std(gae_advs))
         
         return gae_advs, target_values
-        
+    
+    def _lr_decay(self):
+        actor_lr_now = self.actor_lr * (1 - self.train_step / self.max_train_step)
+        critic_lr_now = self.critic_lr * (1 - self.train_step / self.max_train_step)
+        for p in self.actor_optim.param_groups:
+            p['lr'] = actor_lr_now
+        for p in self.critic_optim.param_groups:
+            p['lr'] = critic_lr_now
 
     def train(self, batch):
         obs, acts, rews, next_obs, done = batch['obs'], batch['act'], batch['rew'], batch['next_obs'], batch['done']
@@ -73,22 +90,25 @@ class PPO_Agent(BaseAgent):
         with torch.no_grad():
             values = self.critic(obs).squeeze()
             next_values = self.critic(next_obs).squeeze()
-            old_log_probs = self.actor.get_log_prob(obs, acts)
+            old_log_probs, _ = self.actor.get_logprob_entropy(obs, acts)
 
         gae_advs, target_values = self._compute_gae(values, rews, next_values, done)
             
         # Train policy with multiple steps of gradient descent
         for _ in range(self.train_actor_iters):
-            new_log_probs = self.actor.get_log_prob(obs, acts)
+            new_log_probs, new_entropy = self.actor.get_logprob_entropy(obs, acts)
             ratios = torch.exp(new_log_probs - old_log_probs)
 
             surrogate = ratios * gae_advs
             clipped_surrogate = torch.clamp(ratios, 1.0 - self.clip_pram, 1.0 + self.clip_pram) * gae_advs
 
-            actor_loss = -(torch.min(surrogate, clipped_surrogate)).mean()
-
+            entropy_loss = new_entropy.mean()
+            actor_loss = -(torch.min(surrogate, clipped_surrogate)).mean() - self.ent_coef * entropy_loss
+            
             self.actor_optim.zero_grad()
             actor_loss.backward()
+            if self.use_grad_clip:
+                torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
             self.actor_optim.step()
 
         # Train value function with multiple steps of gradient descent
@@ -97,9 +117,15 @@ class PPO_Agent(BaseAgent):
             critic_loss = F.mse_loss(target_values, values)
             self.critic_optim.zero_grad()
             critic_loss.backward()
+            if self.use_grad_clip:
+                torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
             self.critic_optim.step()
 
+        if self.use_lr_decay:
+            self._lr_decay()
+
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
-                           "critic_loss": critic_loss.cpu().item()}
+                           "critic_loss": critic_loss.cpu().item(),
+                           "entropy": entropy_loss.cpu().item()}
 
         return train_summaries 

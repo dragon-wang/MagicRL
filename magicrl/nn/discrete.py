@@ -71,11 +71,12 @@ class CategoricalActor(nn.Module):
 
         return act, max_prob_action
     
-    def get_log_prob(self, obs, act):
+    def get_logprob_entropy(self, obs, act):
         feature = self.feature_net(obs) if self.feature_net is not None else obs
         logits = self.mlp(feature)
         dist = Categorical(logits=logits)
         
         log_prob = dist.log_prob(act)
+        entropy = dist.entropy()
 
-        return log_prob  # act: (n, ), log_prob: (n, )
+        return log_prob, entropy  # act: (n, ) -> log_prob: (n, ); entropy: (n, )

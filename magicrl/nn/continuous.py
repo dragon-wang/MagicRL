@@ -168,7 +168,7 @@ class GaussionActor(nn.Module):
 
         return act, mu_act
     
-    def get_log_prob(self, obs, act):
+    def get_logprob_entropy(self, obs, act):
         x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
 
         mu = self.fc_mu(x)
@@ -176,5 +176,6 @@ class GaussionActor(nn.Module):
         dist = Normal(mu, std)
 
         log_prob = dist.log_prob(act).sum(1)
+        entropy = dist.entropy().sum(1)
 
-        return log_prob  # act: (n, m), log_prob: (n, )
+        return log_prob, entropy  # act: (n, m) -> log_prob: (n, ); entropy: (n, )

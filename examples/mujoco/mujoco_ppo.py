@@ -19,12 +19,12 @@ from magicrl.env.maker import make_gym_env, get_gym_space
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Pendulum-v1')
+    parser.add_argument('--env', type=str, default='Hopper-v4')
     parser.add_argument('--train_num', type=int, default=1)
     parser.add_argument('--eval_num', type=int, default=1)
-    parser.add_argument('--traj_length', type=int, default=200)
-    parser.add_argument('--max_train_step', type=int, default=50000)
-    parser.add_argument('--learn_id', type=str, default='ppo_Pendulum')
+    parser.add_argument('--traj_length', type=int, default=2048)
+    parser.add_argument('--max_train_step', type=int, default=1000000)
+    parser.add_argument('--learn_id', type=str, default='ppo_Hopper')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -48,22 +48,13 @@ if __name__ == '__main__':
         
     # 2.Make agent.
     obs_dim = observation_space.shape[0]
-    
-
-    if isinstance(action_space, Discrete):
-        act_num = action_space.n
-        actor = CategoricalActor(obs_dim=obs_dim, act_num=act_num, 
-                                 hidden_size=[64, 64],hidden_activation=nn.Tanh)
-    elif isinstance(action_space, Box):
-        act_dim = action_space.shape[0]
-        act_bound = action_space.high[0]
-        actor = GaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, 
-                              hidden_size=[64, 64], hidden_activation=nn.Tanh)
-    else:
-        raise TypeError
+    act_dim = action_space.shape[0]
+    act_bound = action_space.high[0]
+    actor = GaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, 
+                            hidden_size=[256, 256], hidden_activation=nn.Tanh)
+ 
         
-        
-    critic = SimpleCritic(obs_dim=obs_dim, act_dim=0, hidden_size=[64, 64], hidden_activation=nn.Tanh)
+    critic = SimpleCritic(obs_dim=obs_dim, act_dim=0, hidden_size=[256, 256], hidden_activation=nn.Tanh)
 
 
     agent = PPO_Agent(actor=actor, 
@@ -97,9 +88,9 @@ if __name__ == '__main__':
                                    agent=agent,
                                    buffer=trajectoryBuffer,
                                    max_train_step=args.max_train_step,
-                                   learner_log_freq=500,
-                                   agent_log_freq=5000,
-                                   eval_freq=1000,
+                                   learner_log_freq=5000,
+                                   agent_log_freq=100000,
+                                   eval_freq=5000,
                                    resume=args.resume)
         learner.learn()
 
