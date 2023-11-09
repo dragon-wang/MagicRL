@@ -120,7 +120,8 @@ class OnPolicyLearner(BaseLearner):
 
                 if t_length == self.trajectory_length:
                     # sample data from the buffer and clear the buffer.
-                    batch = self.buffer.sample(device=self.agent.device)
+                    self.buffer.finish_path(agent=self.agent)
+                    batch = self.buffer.sample(device=self.agent.device)       
                     # train agent with the sampled data.
                     train_summaries = self.agent.train(batch)
 

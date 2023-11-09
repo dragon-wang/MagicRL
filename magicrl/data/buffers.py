@@ -139,6 +139,16 @@ def _concat_batch(batch_list: Union[List[Dict], Tuple[Dict]]):
             batches[k] = _concat_batch([batch_list[i][k] for i in range(len(batch_list))])
     return batches
 
+def _stack_batch(batch_list: Union[List[Dict], Tuple[Dict]]):
+    batches = {}
+    for k, v in batch_list[0].items():
+        if not isinstance(v, Dict):
+            batches[k] = np.stack([batch_list[i][k] for i in range(len(batch_list))])
+        else: 
+            batches[k] = _stack_batch([batch_list[i][k] for i in range(len(batch_list))])
+    return batches
+
+
 class BaseBuffer(ABC):
     def __init__(self, buffer_size):
         self.buffer_size = buffer_size
@@ -199,6 +209,8 @@ class TrajectoryBuffer(BaseBuffer):
         self._pointer = 0  # Point to the current position in the buffer
 
     def add(self, transition: Dict):
+        assert (self._pointer < self.buffer_size
+                ), 'The buffer is full now. It needs to be "sample" or "clear" before next add.'
         if not self._buffer:
             _build_buffer(self._buffer, transition, self.buffer_size)
         _add_tran(self._buffer, transition, index=self._pointer)
@@ -206,12 +218,48 @@ class TrajectoryBuffer(BaseBuffer):
     
     def sample(self, device=None, dtype=torch.float32):
         assert (self._pointer == self.buffer_size
-                ), f"The buffer is not full. The expected size is {self.buffer_size}, but now is {self._pointer}"
+                ), f'The buffer is not full. The expected size is {self.buffer_size}, but now is {self._pointer}'
         
         if device is not None:
             _to_tensor(self._buffer, device, dtype=dtype)
         return self._buffer
     
+    def finish_path(self, agent):
+        """This method is called at the end of a trajectory.
+        values
+        gae_advs
+        log_probs
+        """
+        obs = torch.as_tensor(self._buffer['obs'], dtype=torch.float32, device=agent.device)
+        act = torch.as_tensor(self._buffer['act'], dtype=torch.float32, device=agent.device)
+        rew = torch.as_tensor(self._buffer['rew'], dtype=torch.float32, device=agent.device)
+        next_obs = torch.as_tensor(self._buffer['next_obs'], dtype=torch.float32, device=agent.device)
+        done = torch.as_tensor(self._buffer['done'], dtype=torch.float32, device=agent.device)
+
+        gamma = agent.gamma
+        gae_lambda = agent.gae_lambda
+        gae_normalize = agent.gae_normalize
+
+        with torch.no_grad():
+            values = agent.critic(obs).squeeze()
+            next_values = agent.critic(next_obs).squeeze()
+            log_probs, _ = agent.actor.get_logprob_entropy(obs, act)
+
+        gae = 0
+        gae_advs = torch.zeros_like(rew, device=agent.device)
+        for i in reversed(range(len(rew))):
+            delta = rew[i] + gamma * next_values[i] * (1 - done[i]) - values[i]
+            gae = delta + gamma * gae_lambda * gae * (1 - done[i])
+            gae_advs[i] = gae
+
+        if gae_normalize:
+            gae_advs = (gae_advs - torch.mean(gae_advs) / torch.std(gae_advs))
+
+        self._buffer['values'] = values
+        self._buffer['log_probs'] = log_probs
+        self._buffer['gae_advs'] = gae_advs
+
+
     def clear(self):
         self._buffer.clear()
         self._pointer = 0

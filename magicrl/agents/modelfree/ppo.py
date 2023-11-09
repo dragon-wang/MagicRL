@@ -60,21 +60,6 @@ class PPO_Agent(BaseAgent):
                 action = eval_action 
 
         return action.cpu().numpy()
-
-    def _compute_gae(self, values, rews, next_values, done):
-        gae = 0
-        gae_advs = torch.zeros_like(rews)
-        for i in reversed(range(len(rews))):
-            delta = rews[i] + self.gamma * next_values[i] * (1 - done[i]) - values[i]
-            gae = delta + self.gamma * self.gae_lambda * gae * (1 - done[i])
-            gae_advs[i] = gae
-
-        target_values = gae_advs + values
-
-        if self.gae_normalize:
-            gae_advs = (gae_advs - torch.mean(gae_advs) / torch.std(gae_advs))
-        
-        return gae_advs, target_values
     
     def _lr_decay(self):
         actor_lr_now = self.actor_lr * (1 - self.train_step / self.max_train_step)
@@ -85,15 +70,9 @@ class PPO_Agent(BaseAgent):
             p['lr'] = critic_lr_now
 
     def train(self, batch):
-        obs, acts, rews, next_obs, done = batch['obs'], batch['act'], batch['rew'], batch['next_obs'], batch['done']
+        obs, acts, values, old_log_probs, gae_advs = batch['obs'], batch['act'], batch['values'], batch['log_probs'], batch['gae_advs']
+        target_values = gae_advs + values
         
-        with torch.no_grad():
-            values = self.critic(obs).squeeze()
-            next_values = self.critic(next_obs).squeeze()
-            old_log_probs, _ = self.actor.get_logprob_entropy(obs, acts)
-
-        gae_advs, target_values = self._compute_gae(values, rews, next_values, done)
-            
         # Train policy with multiple steps of gradient descent
         for _ in range(self.train_actor_iters):
             new_log_probs, new_entropy = self.actor.get_logprob_entropy(obs, acts)
