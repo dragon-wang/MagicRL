@@ -13,18 +13,18 @@ from magicrl.data.buffers import TrajectoryBuffer, VectorBuffer
 from magicrl.learner import OnPolicyLearner
 from magicrl.learner.interactor import Inferrer
 from magicrl.nn.continuous import GaussionActor, SimpleCritic
-from magicrl.nn.discrete import CategoricalActor
 
 from magicrl.env.maker import make_gym_env, get_gym_space
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='Hopper-v4')
     parser.add_argument('--train_num', type=int, default=1)
-    parser.add_argument('--eval_num', type=int, default=1)
+    parser.add_argument('--eval_num', type=int, default=10)
     parser.add_argument('--traj_length', type=int, default=2048)
-    parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='ppo_Hopper')
+    parser.add_argument('--max_train_step', type=int, default=2000000)
+    parser.add_argument('--learn_id', type=str, default='ppo_mujoco')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -50,11 +50,11 @@ if __name__ == '__main__':
     obs_dim = observation_space.shape[0]
     act_dim = action_space.shape[0]
     act_bound = action_space.high[0]
+
     actor = GaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, 
-                            hidden_size=[256, 256], hidden_activation=nn.Tanh)
- 
-        
-    critic = SimpleCritic(obs_dim=obs_dim, act_dim=0, hidden_size=[256, 256], hidden_activation=nn.Tanh)
+                            hidden_size=[64, 64], hidden_activation=nn.Tanh)
+      
+    critic = SimpleCritic(obs_dim=obs_dim, act_dim=0, hidden_size=[64, 64], hidden_activation=nn.Tanh)
 
 
     agent = PPO_Agent(actor=actor, 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
                      actor_lr=3e-4,
                      critic_lr=3e-4,
                      gae_lambda=0.95,
-                     gae_normalize=False,
+                     gae_normalize=True,
                      clip_pram=0.2,
                      ent_coef=0.01,
                      use_grad_clip=True,
@@ -77,9 +77,9 @@ if __name__ == '__main__':
         if args.train_num == 1:
             trajectoryBuffer = TrajectoryBuffer(buffer_size=args.traj_length)
         else:
-            trajectoryBuffer = VectorBuffer(buffer_size=args.traj_length, 
-                                        buffer_num=args.train_num, 
-                                        buffer_class=TrajectoryBuffer)
+            trajectoryBuffer = VectorBuffer(buffer_size=args.traj_length  * args.train_num,  # total size of n buffer.
+                                            buffer_num=args.train_num, 
+                                            buffer_class=TrajectoryBuffer)
         
         learner = OnPolicyLearner( trajectory_length=args.traj_length,
                                    learn_id=args.learn_id,

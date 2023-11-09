@@ -152,6 +152,9 @@ def _stack_batch(batch_list: Union[List[Dict], Tuple[Dict]]):
 class BaseBuffer(ABC):
     def __init__(self, buffer_size):
         self.buffer_size = buffer_size
+        self._buffer = {}
+        self._pointer = 0  # Point to the current position in the buffer
+        self._current_size = 0  # The current size of the buffer
     
     @abstractmethod
     def add(self, transition: Dict):
@@ -175,10 +178,6 @@ class ReplayBuffer(BaseBuffer):
     def __init__(self, buffer_size: int):
         super().__init__(buffer_size)
         
-        self._buffer = {}
-        self._pointer = 0  # Point to the current position in the buffer
-        self._current_size = 0  # The current size of the buffer
-
     def add(self, transition: Dict):
         if not self._buffer:
             _build_buffer(self._buffer, transition, self.buffer_size)
@@ -204,25 +203,27 @@ class ReplayBuffer(BaseBuffer):
 class TrajectoryBuffer(BaseBuffer):
     def __init__(self, buffer_size: int):
         super().__init__(buffer_size)
-        
-        self._buffer = {}
-        self._pointer = 0  # Point to the current position in the buffer
 
     def add(self, transition: Dict):
         assert (self._pointer < self.buffer_size
-                ), 'The buffer is full now. It needs to be "sample" or "clear" before next add.'
+                ), 'The buffer is full now. It needs to be "clear" before next add.'
         if not self._buffer:
             _build_buffer(self._buffer, transition, self.buffer_size)
         _add_tran(self._buffer, transition, index=self._pointer)
         self._pointer += 1
+        self._current_size = self._pointer
     
-    def sample(self, device=None, dtype=torch.float32):
+    def sample(self, batch_size, device=None, dtype=torch.float32):
         assert (self._pointer == self.buffer_size
                 ), f'The buffer is not full. The expected size is {self.buffer_size}, but now is {self._pointer}'
-        
+        if batch_size == self.buffer_size:
+            samples = self._buffer
+        else:
+            indexes = np.random.choice(self._pointer, size=batch_size, replace=True)
+            samples = _get_trans(self._buffer, indexes)
         if device is not None:
-            _to_tensor(self._buffer, device, dtype=dtype)
-        return self._buffer
+            _to_tensor(samples, device, dtype=dtype)
+        return samples
     
     def finish_path(self, agent):
         """This method is called at the end of a trajectory.
@@ -255,9 +256,9 @@ class TrajectoryBuffer(BaseBuffer):
         if gae_normalize:
             gae_advs = (gae_advs - torch.mean(gae_advs) / torch.std(gae_advs))
 
-        self._buffer['values'] = values
-        self._buffer['log_probs'] = log_probs
-        self._buffer['gae_advs'] = gae_advs
+        self._buffer['values'] = values.cpu().numpy()
+        self._buffer['log_probs'] = log_probs.cpu().numpy()
+        self._buffer['gae_advs'] = gae_advs.cpu().numpy()
 
 
     def clear(self):
@@ -302,3 +303,11 @@ class VectorBuffer(BaseBuffer):
 
     def load(self):
         pass
+
+    def finish_path(self, agent):
+        for buffer in self.buffer_list:
+            buffer.finish_path(agent)
+
+    def clear(self):
+        for buffer in self.buffer_list:
+            buffer.clear()
