@@ -14,6 +14,10 @@ LOG_STD_MIN = -20
 LOG_STD_MAX = 2
 
 
+"""
+The network in MagicRL is like:
+    obs -> feature_net -> mlp -> act or Q
+"""
 class SimpleActor(nn.Module):
     """SimpleActor used in DDPG, TD3.
     """

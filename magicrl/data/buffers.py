@@ -227,9 +227,7 @@ class TrajectoryBuffer(BaseBuffer):
     
     def finish_path(self, agent):
         """This method is called at the end of a trajectory.
-        values
-        gae_advs
-        log_probs
+        The 'values', 'gae_advs' and 'log_probs' will be computed in this function.
         """
         obs = torch.as_tensor(self._buffer['obs'], dtype=torch.float32, device=agent.device)
         act = torch.as_tensor(self._buffer['act'], dtype=torch.float32, device=agent.device)
