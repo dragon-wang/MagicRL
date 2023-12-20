@@ -115,7 +115,7 @@ class OnPolicyLearner(BaseLearner):
             while self.agent.train_step < self.max_train_step:
 
                 # collect data by interacting with the environment.
-                self.collector.collect(n_step=1)
+                self.collector.collect(n_step=1, save_next_obs=True)
                 t_length += 1
 
                 if t_length == self.trajectory_length:

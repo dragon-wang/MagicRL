@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 
 from magicrl.env import BaseVectorEnv, DummyVectorEnv
-from magicrl.data import BaseBuffer
+from magicrl.data import BaseBuffer, VectorBuffer
 from magicrl.agents import BaseAgent
 
 
@@ -22,7 +22,7 @@ class Collector:
     def __init__(self, 
                  env: Union[gym.Env, BaseVectorEnv],
                  agent: BaseAgent, 
-                 buffer: BaseBuffer
+                 buffer: Union[BaseBuffer, VectorBuffer]
                  ) -> None:
         if isinstance(env, gym.Env):
             self.env = DummyVectorEnv([env])
@@ -32,8 +32,9 @@ class Collector:
         self.buffer = buffer
 
         self.last_obs, _ = self.env.reset()
+        self.cur_steps = np.zeros(self.env.env_num, dtype=np.int32)
 
-    def collect(self, n_step: int = None, is_explore=False, random: bool = False):
+    def collect(self, n_step: int = None, is_explore=False, random: bool = False, save_next_obs=False):
         obs = self.last_obs
 
         t = _explore_tqdm(n_step, random) if is_explore else range(n_step)
@@ -44,19 +45,41 @@ class Collector:
                 act = self.agent.select_action(obs)
             next_obs, reward, terminated, truncated, _ = self.env.step(act)
             done = np.logical_or(terminated, truncated)
+            self.cur_steps += 1
             
-            transitions = [{"obs": obs[i], 
-                            "act": act[i],
-                            "rew": reward[i],
-                            "next_obs": next_obs[i],
-                            'done': done[i]} 
-                            for i in range(self.env.env_num)]
-
-            self.buffer.add(transitions if self.env.env_num > 1 else transitions[0])
+            if save_next_obs:  
+                transitions = [{
+                                "obs": obs[i],
+                                "act": act[i],
+                                "rew": reward[i],
+                                'done': done[i],
+                                'next_obs': next_obs[i]
+                                } 
+                                for i in range(self.env.env_num)]
+            else:  
+                transitions = [{
+                                "obs": obs[i],
+                                "act": act[i],
+                                "rew": reward[i],
+                                'done': done[i],
+                                } 
+                                for i in range(self.env.env_num)]
+                
+            # # The rnn_state is like: {'hidden': np.ndarray, 'cell': np.ndarray}
+            # if rnn_state is not None:
+            #     for i in range(self.env.env_num):
+            #         transitions[i]['rnn_state'] = rnn_state[i]
+            
+            if self.env.env_num > 1:
+                self.buffer.add(transitions, self.cur_steps)
+            else:
+                self.buffer.add(transitions[0], self.cur_steps[0])
 
             if np.any(done):
                 reset_id = np.where(done)[0]
-                next_obs[reset_id], _ = self.env.reset(reset_id)        
+                next_obs[reset_id], _ = self.env.reset(reset_id)    
+                self.cur_steps[reset_id] = 0    
             obs = next_obs
+
         self.last_obs = obs
                 

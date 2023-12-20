@@ -16,9 +16,11 @@ def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
                      "visual_0": np.ndarray (b2, c2)
                      ...
     "act": "discrete": np.ndarray ()  # scalar
-           "continuous": np.ndarray (e1, )
+           "continuous": np.ndarray (d1, )
     "rew": np.ndarray ()  # scalar
     "done": np.ndarray ()  # scalar
+    "rnn_state": "hidden": np.ndarray (num_layers, rnn_hidden_size)
+                 "cell": np.ndarray (num_layers, rnn_hidden_size)
 
     If buffer_size = n, the buffer is initialized like:
     "obs": "vector": "vector_0": np.empty (n, a1)
@@ -28,9 +30,14 @@ def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
                      "visual_0": np.empty (n, b2, c2)
                      ...
     "act": "discrete": np.empty (n, )
-           "continuous": np.empty (n, e1)
+           "continuous": np.empty (n, d1)
     "rew": np.empty (n, )  # scalar
     "done": np.empty (n, )  # scalar
+    "rnn_state": "hidden": np.ndarray (n, num_layers, rnn_hidden_size)
+                 "cell": np.ndarray (n, num_layers, rnn_hidden_size)
+
+    *Note: In order to reduce memory consumption, the "next_obs" is stored in "ReplayBuffer".
+           But it is stored in "TrajectoryBuffer", because the "TrajectoryBuffer" will be cleared after each training step.
 
     Args:
         buffer (Dict): The buffer that need to build.
@@ -50,22 +57,25 @@ def _add_tran(buffer: Dict, transition: Dict, index=1):
     """Add a transition into buffer.
     
     If the buffer with buffer_size = 5 is:
-    "obs": [a, 0, 0, 0, 0]
-    "act": [b, 0, 0, 0, 0]
-    "rew": [c, 0, 0, 0, 0]
-    "done": [d, 0, 0, 0, 0]
+    "obs": "vector": "vector_0": [a, 0, 0, 0, 0]
+                     "vector_1": [b, 0, 0, 0, 0]
+    "act":  [c, 0, 0, 0, 0]
+    "rew":  [d, 0, 0, 0, 0]
+    "done": [e, 0, 0, 0, 0]
 
     And the transition is:
-    "obs": c
-    "act": d
-    "rew": e
-    "done": f
+    "obs": "vector": "vector_0": f
+                     "vector_1": g
+    "act":  h
+    "rew":  i
+    "done": j
 
     After call _add_tran(buffer, transition, 1), the buffer is:
-    "obs": [a, 1, 0, 0, 0]
-    "act": [b, 1, 0, 0, 0]
-    "rew": [c, 1, 0, 0, 0]
-    "done": [d, 1, 0, 0, 0]
+    "obs": "vector": "vector_0": [a, f, 0, 0, 0]
+                     "vector_1": [b, g, 0, 0, 0]
+    "act":  [c, h, 0, 0, 0]
+    "rew":  [d, i, 0, 0, 0]
+    "done": [e, j, 0, 0, 0]
 
     Args:
         buffer (Dict): The buffer that need to add.
@@ -84,7 +94,7 @@ def _get_trans(buffer: Dict, index: Union[int, Sequence[int]]):
     If index is i, the result will squeeze the dim;
     If index is [i] or [i,j], the result will not squeeze the dim;
 
-    If the buffer with buffer_size = 5 is:
+    If the buffer with buffer_size = 3 is:
     "obs": [[a1, a2, a3], [b1, b2, b3], [c1, c2, c3]]
     "act": [[d1, d2, d3], [e1, e2, e3], [f1, f2, f3]]
 
@@ -97,8 +107,8 @@ def _get_trans(buffer: Dict, index: Union[int, Sequence[int]]):
     "act": [[e1, e2, e3]]
 
     The result of _get_trans(buffer, [1,2]) is:
-    "obs": [[a2, a3], [b2, b3], [c2, c3]]
-    "act": [[d2, d3], [e2, e3], [f2, f3]] 
+    "obs": [[b1, b2, b3], [c1, c2, c3]]
+    "act": [[e1, e2, e3], [f1, f2, f3]] 
 
     Args:
         buffer (Dict): The buffer that need to add.
@@ -155,9 +165,10 @@ class BaseBuffer(ABC):
         self._buffer = {}
         self._pointer = 0  # Point to the current position in the buffer
         self._current_size = 0  # The current size of the buffer
+        self.episode_steps = np.zeros(self.buffer_size, dtype=np.int32)
     
     @abstractmethod
-    def add(self, transition: Dict):
+    def add(self, transition: Dict, step: int):
         pass
     
     @abstractmethod
@@ -178,16 +189,19 @@ class ReplayBuffer(BaseBuffer):
     def __init__(self, buffer_size: int):
         super().__init__(buffer_size)
         
-    def add(self, transition: Dict):
+    def add(self, transition: Dict, step: int):
         if not self._buffer:
             _build_buffer(self._buffer, transition, self.buffer_size)
         _add_tran(self._buffer, transition, index=self._pointer)
+        self.episode_steps[self._pointer] = step
+        
         self._pointer = (self._pointer + 1) % self.buffer_size
         self._current_size = min(self._current_size + 1, self.buffer_size)
 
     def sample(self, batch_size, device=None, dtype=torch.float32):
-        indexes = np.random.choice(self._current_size, size=batch_size, replace=True)
+        indexes = np.random.choice(self._current_size-1, size=batch_size, replace=True)
         samples = _get_trans(self._buffer, indexes)
+        samples['next_obs'] = _get_trans(self._buffer, indexes+1)['obs']
         if device is not None:
             _to_tensor(samples, device, dtype=dtype)
         return samples
@@ -204,12 +218,15 @@ class TrajectoryBuffer(BaseBuffer):
     def __init__(self, buffer_size: int):
         super().__init__(buffer_size)
 
-    def add(self, transition: Dict):
+    def add(self, transition: Dict, step: int):
         assert (self._pointer < self.buffer_size
                 ), 'The buffer is full now. It needs to be "clear" before next add.'
         if not self._buffer:
             _build_buffer(self._buffer, transition, self.buffer_size)
+
         _add_tran(self._buffer, transition, index=self._pointer)
+        self.episode_steps[self._pointer] = step
+
         self._pointer += 1
         self._current_size = self._pointer
     
@@ -219,7 +236,7 @@ class TrajectoryBuffer(BaseBuffer):
         if batch_size == self.buffer_size:
             samples = self._buffer
         else:
-            indexes = np.random.choice(self._pointer, size=batch_size, replace=True)
+            indexes = np.random.choice(self._pointer-1, size=batch_size, replace=True)
             samples = _get_trans(self._buffer, indexes)
         if device is not None:
             _to_tensor(samples, device, dtype=dtype)
@@ -271,18 +288,21 @@ class TrajectoryBuffer(BaseBuffer):
         # load from hdf5
         pass
 
-class VectorBuffer(BaseBuffer):
-    def __init__(self, buffer_size: int, buffer_num: int, buffer_class: BaseBuffer):
-        super().__init__(buffer_size)  # The size of total buffer.
+class VectorBuffer:
+    def __init__(self, 
+                 buffer_size: int, # The size of total buffer.
+                 buffer_num: int,  # The number of buffer in cector buffers.
+                 buffer_class: BaseBuffer):
+        self.buffer_size = buffer_size
         self.buffer_num = buffer_num
         self.per_buffer_size = int(self.buffer_size / self.buffer_num)  # The size of each buffer in VectorBuffer.
         self.buffer_list = [buffer_class(self.per_buffer_size) for _ in range(buffer_num)]
 
-    def add(self, transitions: List[Dict]) -> None:
+    def add(self, transitions: List[Dict], steps: List[int]) -> None:
         assert (self.buffer_num == len(transitions)
                 ), "The num of envs is not equal to the num of buffers."
         for i in range(self.buffer_num):
-            self.buffer_list[i].add(transitions[i])
+            self.buffer_list[i].add(transitions[i], steps[i])
         self.current_size = sum([self.buffer_list[i]._current_size for i in range(self.buffer_num)])
 
     def sample(self, batch_size, device=None, dtype=torch.float32) -> Dict:
