@@ -53,6 +53,8 @@ class Collector:
                                 "act": act[i],
                                 "rew": reward[i],
                                 'done': done[i],
+                                'term': terminated[i],
+                                'trun': truncated[i],
                                 'next_obs': next_obs[i]
                                 } 
                                 for i in range(self.env.env_num)]
@@ -62,6 +64,8 @@ class Collector:
                                 "act": act[i],
                                 "rew": reward[i],
                                 'done': done[i],
+                                'term': terminated[i],
+                                'trun': truncated[i]
                                 } 
                                 for i in range(self.env.env_num)]
                 

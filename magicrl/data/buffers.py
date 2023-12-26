@@ -140,6 +140,33 @@ def _to_tensor(data: Dict, device, dtype=torch.float32):
         else:
             _to_tensor(data[k], device)
 
+def _pad_buffer(buffer: Dict, pad_size: int):
+    """Pad buffer with zeros.
+
+    If the buffer with buffer_size = 5 is:
+    "obs": "vector": "vector_0": [a, 0, 0, 0, 0]
+                     "vector_1": [b, 0, 0, 0, 0]
+    "act":  [c, 0, 0, 0, 0]
+    "rew":  [d, 0, 0, 0, 0]
+    "done": [e, 0, 0, 0, 0]
+
+    After call _pad_buffer(buffer, 2), the buffer is:
+    "obs": "vector": "vector_0": [a, f, 0, 0, 0, 0, 0]
+                     "vector_1": [b, g, 0, 0, 0, 0, 0]
+    "act":  [c, h, 0, 0, 0, 0, 0]
+    "rew":  [d, i, 0, 0, 0, 0, 0]
+    "done": [e, j, 0, 0, 0, 0, 0]
+
+    The new buffer_size is 7.
+    """
+    for k, v in buffer.items():
+        if not isinstance(v, Dict):
+            shp = (pad_size, *buffer[k].shape[1:])
+            buffer[k] = np.concatenate((buffer[k], np.zeros(shp)), axis=0)
+        else:
+            _pad_buffer(buffer[k], pad_size)
+
+
 def _concat_batch(batch_list: Union[List[Dict], Tuple[Dict]]):
     batches = {}
     for k, v in batch_list[0].items():
@@ -186,7 +213,7 @@ class BaseBuffer(ABC):
         pass
 
 class ReplayBuffer(BaseBuffer):
-    def __init__(self, buffer_size: int):
+    def __init__(self, buffer_size: int = 0):
         super().__init__(buffer_size)
         
     def add(self, transition: Dict, step: int):
@@ -199,13 +226,37 @@ class ReplayBuffer(BaseBuffer):
         self._current_size = min(self._current_size + 1, self.buffer_size)
 
     def sample(self, batch_size, device=None, dtype=torch.float32):
-        indexes = np.random.choice(self._current_size-1, size=batch_size, replace=True)
+        """Sample a batch from buffer.
+        For an 'obs', if its 'trun' is True, it will not be sampled; 
+        If its 'term' is True, it will be sampled.
+        For example, if the buffer is like:
+            obs:  o1, o2, o3, o4, o5, o6, o7, o8, o9
+            term: F,  F,  F,  F,  F,  F,  T,  F,  F
+            trun: F,  F,  F,  T,  F,  F,  F,  F,  F
+        Then the transition1 '(o4,a4,r4,o5,d5)' can not be sampled;
+        But the transition2 '(o7,a7,r7,o8,d7)' can be sampled;
+        Because although target-q is 0 when training with these two transitions, 
+        the reward of the 'trun' is not the 'term' reward, which may lead to inaccurate estimation.
+        """
+        not_trun_index = np.where(~self._buffer['trun'][:self._current_size-1])[0]
+        indexes = np.random.choice(not_trun_index, size=batch_size, replace=True)
         samples = _get_trans(self._buffer, indexes)
         samples['next_obs'] = _get_trans(self._buffer, indexes+1)['obs']
         if device is not None:
             _to_tensor(samples, device, dtype=dtype)
         return samples
 
+    def init_offline(self, offlie_data, data_num):
+        self._buffer = offlie_data
+        self.buffer_size = data_num
+        self._current_size = data_num
+    
+    def pad(self, pad_size):
+        _pad_buffer(self._buffer, pad_size)
+        if self._current_size == self.buffer_size:
+            self._pointer = self.buffer_size + 1
+        self.buffer_size += pad_size
+        
     def save(self):
         # save to hdf5
         pass
@@ -215,7 +266,7 @@ class ReplayBuffer(BaseBuffer):
         pass
 
 class TrajectoryBuffer(BaseBuffer):
-    def __init__(self, buffer_size: int):
+    def __init__(self, buffer_size: int = 0):
         super().__init__(buffer_size)
 
     def add(self, transition: Dict, step: int):
