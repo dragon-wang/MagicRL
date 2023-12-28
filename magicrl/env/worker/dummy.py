@@ -1,6 +1,6 @@
 from typing import Any, Optional, Tuple, Union
 
-import gymnasium as gym
+import gymnasium
 import numpy as np
 
 from magicrl.env.utils import gymnasium_step_type
@@ -9,7 +9,7 @@ from magicrl.env.worker import BaseEnvWorker
 
 class DummyEnvWokrder(BaseEnvWorker):
 
-    def __init__(self, env: gym.Env) -> None:
+    def __init__(self, env: gymnasium.Env) -> None:
         super().__init__(env)
         self.result = None
 
@@ -24,7 +24,10 @@ class DummyEnvWokrder(BaseEnvWorker):
 
     def seed(self, seed: int) -> None:
         self.action_space.seed(seed=seed)
-        self.env.reset(seed=seed)
+        if isinstance(self.env, gymnasium.Env):
+            self.env.reset(seed=seed)
+        else:
+            self.env.seed(seed)
 
     def render(self) -> Any:
         return self.env.render()

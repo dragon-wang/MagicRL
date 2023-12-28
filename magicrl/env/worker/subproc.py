@@ -1,13 +1,13 @@
 from typing import Any, Optional, Tuple, Union
 from multiprocessing import Process, Pipe, connection
 
-import gymnasium as gym
+import gymnasium
 import numpy as np
 
 from magicrl.env.utils import gymnasium_step_type
 from magicrl.env.worker import BaseEnvWorker
 
-def _worker(conn_parent: connection.Connection, conn_child: connection.Connection, env:gym.Env):
+def _worker(conn_parent: connection.Connection, conn_child: connection.Connection, env:gymnasium.Env):
     conn_parent.close()
     try:
         while(True):
@@ -22,7 +22,10 @@ def _worker(conn_parent: connection.Connection, conn_child: connection.Connectio
                 render_return = env.render()
                 conn_child.send(render_return)
             elif cmd == 'seed':
-                env.reset(seed=data)
+                if isinstance(env, gymnasium.Env):
+                    env.reset(seed=data)
+                else:
+                    env.seed(data)
             elif cmd == 'close':
                 close_return = env.close()
                 conn_child.send(close_return)
@@ -36,7 +39,7 @@ def _worker(conn_parent: connection.Connection, conn_child: connection.Connectio
 
 
 class SubprocEnvWorker(BaseEnvWorker):
-    def __init__(self, env: gym.Env) -> None:
+    def __init__(self, env: gymnasium.Env) -> None:
         super().__init__(env)
         self.conn_parent, self.conn_child = Pipe()
         self.process = Process(target=_worker, args=(self.conn_parent, self.conn_child, self.env), daemon=True)

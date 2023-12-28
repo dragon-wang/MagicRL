@@ -1,6 +1,6 @@
 from typing import Any, Optional, Tuple, Union, List
 
-import gymnasium as gym
+import gymnasium
 import numpy as np
 
 from magicrl.env.utils import venvs_step_type
@@ -10,7 +10,7 @@ from magicrl.env.worker import SubprocEnvWorker
 
 
 class BaseVectorEnv:
-    def __init__(self, envs: List[gym.Env], worker_class: BaseEnvWorker) -> None:
+    def __init__(self, envs: List[gymnasium.Env], worker_class: BaseEnvWorker) -> None:
         self.workers = [worker_class(env) for env in envs]
         self.env_num = len(envs)
         self.action_spaces = [worker.action_space for worker in self.workers]
@@ -128,13 +128,13 @@ class BaseVectorEnv:
 class DummyVectorEnv(BaseVectorEnv):
     """Dummy vectorized environment wrapper, implemented in for-loop.
     """
-    def __init__(self, envs: List[gym.Env]) -> None:
+    def __init__(self, envs: List[gymnasium.Env]) -> None:
         super().__init__(envs, DummyEnvWokrder)
 
 
 class SubprocVectorEnv(BaseVectorEnv):
     """Vectorized environment wrapper based on subprocess.
     """
-    def __init__(self, envs: List[gym.Env]) -> None:
+    def __init__(self, envs: List[gymnasium.Env]) -> None:
         super().__init__(envs, SubprocEnvWorker)
     

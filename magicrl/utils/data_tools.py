@@ -11,8 +11,8 @@ def get_d4rl_dataset(env, get_num=None) -> dict:
     data_num = dataset['actions'].shape[0]
 
     obs = dataset['observations'].astype(np.float32)
-    acts = dataset['actions'].astype(np.float32)
-    rews = dataset['rewards'].astype(np.float32)
+    act = dataset['actions'].astype(np.float32)
+    rew = dataset['rewards'].astype(np.float32)
     term = dataset['terminals']
     if 'timeouts' in dataset:
         trun = dataset['timeouts']
@@ -23,16 +23,16 @@ def get_d4rl_dataset(env, get_num=None) -> dict:
     
     if get_num is None:
         data = {'obs': obs,
-                'acts': acts,
-                'rews': rews,
+                'act': act,
+                'rew': rew,
                 'term': term,
                 'trun': trun,
                 'done': done}
     else:
         ind = np.random.choice(data_num, size=get_num, replace=False)
         data = {'obs': obs[ind],
-                'acts': acts[ind],
-                'rews': rews[ind],
+                'act': act[ind],
+                'rew': rew[ind],
                 'term': term[ind],
                 'trun': trun[ind],
                 'done': done[ind]}

@@ -1,5 +1,5 @@
 import numpy as np
-import gymnasium as gym
+import gymnasium
 from gymnasium.wrappers.atari_preprocessing import AtariPreprocessing
 from gymnasium.wrappers.frame_stack import FrameStack
 
@@ -7,7 +7,7 @@ from gymnasium.wrappers.frame_stack import FrameStack
 def wrap_deepmind(env_name, episode_life=True, clip_rewards=True, frame_stack=4, scale=False, render_mode=None):
 
 
-    env = gym.make(env_name, render_mode=render_mode)
+    env = gymnasium.make(env_name, render_mode=render_mode)
 
     env = AtariPreprocessing(env=env,
                              noop_max=30,
@@ -25,7 +25,7 @@ def wrap_deepmind(env_name, episode_life=True, clip_rewards=True, frame_stack=4,
 
     return env
     
-class ClipRewardEnv(gym.RewardWrapper):
+class ClipRewardEnv(gymnasium.RewardWrapper):
     """clips the reward to {+1, 0, -1} by its sign.
     """
 

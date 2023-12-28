@@ -1,5 +1,3 @@
-import gymnasium as gym
-
 from magicrl.env.wrapper import wrap_deepmind
 from magicrl.env import SubprocVectorEnv, DummyVectorEnv
 

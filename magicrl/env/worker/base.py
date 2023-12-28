@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Tuple, Union
 
-import gymnasium as gym
+import gymnasium
 import numpy as np
 
 from magicrl.env.utils import gymnasium_step_type
 
 class BaseEnvWorker(ABC):
     "The code is based on tianshou's worker (https://github.com/thu-ml/tianshou/tree/master/tianshou/env/worker)"
-    def __init__(self, env: gym.Env) -> None:
+    def __init__(self, env: gymnasium.Env) -> None:
         self.env = env
         self.action_space = env.action_space
         self.observation_space = env.observation_space
