@@ -41,7 +41,7 @@ class BCQAgent(BaseAgent):
         self.lmbda = lmbda
 
         self.attr_names.extend(['critic1', 'critic2', 'perturb', 'cvae', 
-                                'target_critic1', 'target_critic2', 'target_perturb'
+                                'target_critic1', 'target_critic2', 'target_perturb',
                                 'critic_optim1', 'critic_optim2', 'perturb_optim', 'cvae_optim'])
 
     def select_action(self, obs, eval=True):

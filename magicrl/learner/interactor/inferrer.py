@@ -1,5 +1,6 @@
 from typing import Any, Optional, Tuple, Union, Dict
 
+import gym
 import gymnasium
 import numpy as np
 
@@ -27,6 +28,8 @@ class Inferrer:
             obs, _ = self.env.reset()
             done = False
             while not done:
+                if isinstance(self.env, gym.Env):
+                    self.env.render()
                 action = self.agent.select_action(np.array([obs]), eval=True)
                 obs, reward, terminated, truncated, _ = self.env.step(action.squeeze(0))
                 done = np.logical_or(terminated, truncated)
