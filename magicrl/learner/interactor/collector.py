@@ -1,7 +1,7 @@
 from typing import Any, Optional, Tuple, Union, Dict
 
 from tqdm import tqdm
-import gymnasium as gym
+import gymnasium
 import numpy as np
 
 from magicrl.env import BaseVectorEnv, DummyVectorEnv
@@ -20,11 +20,11 @@ def _explore_tqdm(step: int, random: bool):
 
 class Collector:
     def __init__(self, 
-                 env: Union[gym.Env, BaseVectorEnv],
+                 env: Union[gymnasium.Env, BaseVectorEnv],
                  agent: BaseAgent, 
                  buffer: Union[BaseBuffer, VectorBuffer]
                  ) -> None:
-        if isinstance(env, gym.Env):
+        if isinstance(env, gymnasium.Env):
             self.env = DummyVectorEnv([env])
         else:
             self.env = env

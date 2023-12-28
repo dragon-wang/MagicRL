@@ -1,6 +1,6 @@
 from typing import Any, Optional, Tuple, Union, Dict
 
-import gymnasium as gym
+import gymnasium
 import numpy as np
 
 from magicrl.agents import BaseAgent
@@ -8,7 +8,7 @@ from magicrl.utils.logger import AgentLogger
 
 
 class Inferrer:
-    def __init__(self, env: gym.Env, agent: BaseAgent, learn_id: str) -> None:
+    def __init__(self, env: gymnasium.Env, agent: BaseAgent, learn_id: str) -> None:
         self.env = env
         self.agent = agent
         self.learn_id = learn_id

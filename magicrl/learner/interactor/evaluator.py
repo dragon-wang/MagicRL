@@ -1,6 +1,7 @@
 from typing import Any, Optional, Tuple, Union, Dict
 
-import gymnasium as gym
+import gymnasium
+import gym
 import numpy as np
 
 from magicrl.env import BaseVectorEnv, DummyVectorEnv
@@ -8,11 +9,11 @@ from magicrl.agents import BaseAgent
 
 
 class Evaluator:
-    def __init__(self, env: Union[gym.Env, BaseVectorEnv], agent: BaseAgent) -> None:
-        if isinstance(env, gym.Env):
-            self.env = DummyVectorEnv([env])
-        else:
+    def __init__(self, env: Union[gymnasium.Env, BaseVectorEnv], agent: BaseAgent) -> None:
+        if isinstance(env, BaseVectorEnv):
             self.env = env
+        else:
+            self.env = DummyVectorEnv([env])
         self.agent = agent
         self.env_num = self.env.env_num
 

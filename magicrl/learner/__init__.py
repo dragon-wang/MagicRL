@@ -1,4 +1,4 @@
-from magicrl.learner.learners import BaseLearner, OffPolicyLearner, OnPolicyLearner
+from magicrl.learner.learners import BaseLearner, OffPolicyLearner, OnPolicyLearner, OfflineLearner
 
 
-__all__ = ['BaseLearner', 'OffPolicyLearner', 'OnPolicyLearner']
+__all__ = ['BaseLearner', 'OffPolicyLearner', 'OnPolicyLearner', 'OfflineLearner']

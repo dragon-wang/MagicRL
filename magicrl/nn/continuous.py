@@ -183,3 +183,116 @@ class GaussionActor(nn.Module):
         entropy = dist.entropy().sum(1)
 
         return log_prob, entropy  # act: (n, m) -> log_prob: (n, ); entropy: (n, )
+    
+
+class CVAE(nn.Module):
+    """
+    Conditional Variational Auto-Encoder(CVAE) used in BCQ and PLAS
+    ref: https://github.com/sfujim/BCQ/blob/4876f7e5afa9eb2981feec5daf67202514477518/continuous_BCQ/BCQ.py#L57
+    """
+
+    def __init__(self,
+                 obs_dim,
+                 act_dim,
+                 latent_dim,
+                 act_bound):
+        """
+        :param obs_dim: The dimension of observation
+        :param act_dim: The dimension if action
+        :param latent_dim: The dimension of latent in CVAE
+        :param act_bound: The maximum value of the action
+        """
+        super().__init__()
+
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.latent_dim = latent_dim
+        self.act_bound = act_bound
+
+        # encoder net
+        self.e1 = nn.Linear(obs_dim + act_dim, 750)
+        self.e2 = nn.Linear(750, 750)
+        self.e3_mu = nn.Linear(750, latent_dim)
+        self.e3_log_std = nn.Linear(750, latent_dim)
+
+        # decoder net
+        self.d1 = nn.Linear(obs_dim + latent_dim, 750)
+        self.d2 = nn.Linear(750, 750)
+        self.d3 = nn.Linear(750, act_dim)
+
+    def encode(self, obs, action):
+        h1 = F.relu(self.e1(torch.cat([obs, action], dim=1)))
+        h2 = F.relu(self.e2(h1))
+        mu = self.e3_mu(h2)
+        log_std = self.e3_log_std(h2).clamp(-4, 15)  # Clamped for numerical stability
+        return mu, log_std
+
+    def reparametrize(self, mu, log_std):
+        std = torch.exp(log_std)
+        eps = torch.randn_like(std)  # sample from standard normal distribution
+        z = mu + eps * std
+        return z
+
+    def decode(self, obs, z=None, z_device=torch.device('cpu')):
+        # When sampling from the VAE, the latent vector is clipped to [-0.5, 0.5]
+        if z is None:
+            z = torch.randn((obs.shape[0], self.latent_dim)).to(z_device).clamp(-0.5, 0.5)
+        h4 = F.relu(self.d1(torch.cat([obs, z], dim=1)))
+        h5 = F.relu(self.d2(h4))
+        recon_action = torch.tanh(self.d3(h5)) * self.act_bound
+        return recon_action
+
+    def decode_multiple_without_squash(self, obs, decode_num=10, z=None, z_device=torch.device('cpu')):
+        """
+        decode n*b action from b obs and not squash
+        """
+        if z is None:
+            z = torch.randn((obs.shape[0] * decode_num, self.latent_dim)).to(z_device).clamp(-0.5, 0.5)
+        obs_temp = torch.repeat_interleave(obs, decode_num, dim=0)
+        h4 = F.relu(self.d1(torch.cat([obs_temp, z], dim=1)))
+        h5 = F.relu(self.d2(h4))
+        raw_action = self.d3(h5)
+        return raw_action.reshape(obs.shape[0], decode_num, -1)  # B*N x D -> B x N x D
+
+    def forward(self, obs, action):
+        mu, log_std = self.encode(obs, action)
+        z = self.reparametrize(mu, log_std)
+        # std = torch.exp(log_std)
+        # dist = Normal(mu, std)
+        # z = dist.rsample()
+        recon_action = self.decode(obs, z)
+        return recon_action, mu, log_std
+
+    def loss_function(self, recon, action, mu, log_std) -> torch.Tensor:
+        recon_loss = F.mse_loss(recon, action)
+        kl_loss = -0.5 * (1 + 2 * log_std - mu.pow(2) - torch.exp(2 * log_std)).mean()
+        loss = recon_loss + 0.5 * kl_loss
+        return loss
+
+
+class PerturbActor(nn.Module):
+    """Used in BCQ.
+    """
+    def __init__(self, 
+                 obs_dim, 
+                 act_dim, 
+                 act_bound, 
+                 hidden_size, 
+                 hidden_activation=nn.ReLU,
+                 phi=0.05  # the Phi in perturbation model:
+                 ):
+        super().__init__()
+
+        self.mlp = MLP(input_dim=obs_dim + act_dim,
+                       output_dim=act_dim,
+                       hidden_size=hidden_size,
+                       hidden_activation=hidden_activation)
+
+        self.act_bound = act_bound
+        self.phi = phi
+
+    def forward(self, obs, action):
+        x = torch.cat([obs, action], dim=1)
+        a = torch.tanh(self.mlp(x))
+        a = self.phi * self.act_bound * a
+        return (a + action).clamp(-self.act_bound, self.act_bound)
