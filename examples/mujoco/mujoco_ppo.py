@@ -5,7 +5,7 @@ import argparse
 import torch
 from torch import nn
 import numpy as np
-import gymnasium as gym
+import gymnasium
 from gymnasium.spaces import Discrete, Box
 
 from magicrl.agents.modelfree.ppo import PPO_Agent
@@ -13,8 +13,7 @@ from magicrl.data.buffers import TrajectoryBuffer, VectorBuffer
 from magicrl.learner import OnPolicyLearner
 from magicrl.learner.interactor import Inferrer
 from magicrl.nn.continuous import GaussionActor, SimpleCritic
-
-from magicrl.env.maker import make_gym_env, get_gym_space
+from magicrl.env.maker import make_gymnasium_env, get_gymnasium_space
 
 
 if __name__ == '__main__':
@@ -36,15 +35,15 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-    observation_space, action_space = get_gym_space(args.env)
+    observation_space, action_space = get_gymnasium_space(args.env)
 
-    # 1.Make Learner and Inferrer.
+    # 1.Make environments.
     if not args.infer:
-        train_envs, eval_envs = make_gym_env(env_name=args.env,
-                                             train_env_num=args.train_num,
-                                             eval_env_num=args.eval_num,
-                                             seed=args.seed,
-                                             dummy=False)
+        train_envs, eval_envs = make_gymnasium_env(env_name=args.env,
+                                                   train_env_num=args.train_num,
+                                                   eval_env_num=args.eval_num,
+                                                   seed=args.seed,
+                                                   dummy=False)
         
     # 2.Make agent.
     obs_dim = observation_space.shape[0]
@@ -95,6 +94,6 @@ if __name__ == '__main__':
         learner.learn()
 
     else:
-        infer_env = gym.make(args.env, render_mode='human')
+        infer_env = gymnasium.make(args.env, render_mode='human')
         inferrer = Inferrer(env=infer_env, agent=agent, learn_id=args.learn_id)
         inferrer.infer(episode_num=10, checkpoint_step=args.infer_step)

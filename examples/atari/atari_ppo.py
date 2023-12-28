@@ -5,8 +5,6 @@ import argparse
 import torch
 from torch import nn
 import numpy as np
-import gymnasium as gym
-from gymnasium.spaces import Discrete, Box
 
 from magicrl.agents.modelfree.ppo import PPO_Agent
 from magicrl.data.buffers import TrajectoryBuffer, VectorBuffer

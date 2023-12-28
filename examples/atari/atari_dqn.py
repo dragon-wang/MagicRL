@@ -4,7 +4,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 import argparse
 import torch
 import numpy as np
-import gymnasium as gym
 
 from magicrl.agents.modelfree.dqn import DQNAgent
 from magicrl.data.buffers import ReplayBuffer, VectorBuffer
