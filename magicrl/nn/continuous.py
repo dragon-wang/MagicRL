@@ -227,12 +227,6 @@ class CVAE(nn.Module):
         log_std = self.e3_log_std(h2).clamp(-4, 15)  # Clamped for numerical stability
         return mu, log_std
 
-    def reparametrize(self, mu, log_std):
-        std = torch.exp(log_std)
-        eps = torch.randn_like(std)  # sample from standard normal distribution
-        z = mu + eps * std
-        return z
-
     def decode(self, obs, z=None, z_device=torch.device('cpu')):
         # When sampling from the VAE, the latent vector is clipped to [-0.5, 0.5]
         if z is None:
@@ -256,10 +250,12 @@ class CVAE(nn.Module):
 
     def forward(self, obs, action):
         mu, log_std = self.encode(obs, action)
-        z = self.reparametrize(mu, log_std)
-        # std = torch.exp(log_std)
-        # dist = Normal(mu, std)
-        # z = dist.rsample()
+
+        # reparametrize
+        std = torch.exp(log_std)
+        dist = Normal(mu, std)
+        z = dist.rsample()
+
         recon_action = self.decode(obs, z)
         return recon_action, mu, log_std
 
