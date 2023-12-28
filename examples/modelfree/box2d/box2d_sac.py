@@ -1,16 +1,16 @@
 import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 import argparse
 import torch
 import numpy as np
 import gymnasium
 
-from magicrl.agents.modelfree.ddpg import DDPGAgent
+from magicrl.agents.modelfree.sac import SACAgent
 from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.continuous import SimpleActor, SimpleCritic
+from magicrl.nn.continuous import RepapamGaussionActor, SimpleCritic
 from magicrl.env.maker import make_gymnasium_env, get_gymnasium_space
 
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--explore_step', type=int, default=10000)
     parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='ddpg_BipedalWalker')
+    parser.add_argument('--learn_id', type=str, default='sac_BipedalWalker')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -50,17 +50,21 @@ if __name__ == '__main__':
     act_dim = action_space.shape[0]
     act_bound = action_space.high[0]
 
-    actor = SimpleActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
-    critic = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
+    actor = RepapamGaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[128, 128])
+    critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[128, 128])
+    critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[128, 128])
 
-    agent = DDPGAgent(actor=actor, 
-                      critic=critic, 
-                      actor_lr=3e-4,
-                      critic_lr=3e-4,
-                      tau=0.005,
-                      exploration_noise=0.1,
-                      device=args.device)
-
+    agent = SACAgent(actor=actor, 
+                     critic1=critic1,
+                     critic2=critic2, 
+                     actor_lr=3e-4,
+                     critic_lr=3e-4,
+                     alpha_lr=3e-4,
+                     tau=0.005,
+                     alpha=0.2,
+                     auto_alpha=True,
+                     device=args.device)
+    
     # 3.Make Learner and Inferrer.
     if not args.infer:
         if args.train_num == 1:

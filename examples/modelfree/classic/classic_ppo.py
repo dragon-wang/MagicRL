@@ -1,5 +1,5 @@
 import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 import argparse
 import torch
@@ -19,12 +19,12 @@ from magicrl.env.maker import make_gymnasium_env, get_gymnasium_space
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='LunarLander-v2')
-    parser.add_argument('--train_num', type=int, default=10)
+    parser.add_argument('--env', type=str, default='CartPole-v1')
+    parser.add_argument('--train_num', type=int, default=1)
     parser.add_argument('--eval_num', type=int, default=10)
     parser.add_argument('--traj_length', type=int, default=128)
-    parser.add_argument('--max_train_step', type=int, default=300000)
-    parser.add_argument('--learn_id', type=str, default='ppo_box2d')
+    parser.add_argument('--max_train_step', type=int, default=20000)
+    parser.add_argument('--learn_id', type=str, default='ppo_classic')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -71,11 +71,11 @@ if __name__ == '__main__':
                      actor_lr=1e-3,
                      critic_lr=1e-3,
                      gae_lambda=0.95,
-                     gae_normalize=True,
+                     gae_normalize=False,
                      clip_pram=0.2,
                      ent_coef=0.01,
-                     use_grad_clip=True,
-                     use_lr_decay=True,
+                     use_grad_clip=False,
+                     use_lr_decay=False,
                      train_actor_iters=10,
                      train_critic_iters=10,
                      max_train_step=args.max_train_step,
@@ -97,8 +97,8 @@ if __name__ == '__main__':
                                    agent=agent,
                                    buffer=trajectoryBuffer,
                                    max_train_step=args.max_train_step,
-                                   learner_log_freq=2000,
-                                   agent_log_freq=50000,
+                                   learner_log_freq=1000,
+                                   agent_log_freq=5000,
                                    eval_freq=1000,
                                    resume=args.resume)
         learner.learn()

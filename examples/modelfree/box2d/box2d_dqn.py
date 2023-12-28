@@ -1,29 +1,29 @@
 import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 import argparse
 import torch
 import numpy as np
 import gymnasium
 
-from magicrl.agents.modelfree.sac import SACAgent
+from magicrl.agents.modelfree.dqn import DQNAgent
 from magicrl.data.buffers import ReplayBuffer, VectorBuffer
 from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.continuous import RepapamGaussionActor, SimpleCritic
+from magicrl.nn.discrete import QNet
 from magicrl.env.maker import make_gymnasium_env, get_gymnasium_space
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Pendulum-v1')
-    parser.add_argument('--train_num', type=int, default=1)
+    parser.add_argument('--env', type=str, default='LunarLander-v2')
+    parser.add_argument('--train_num', type=int, default=10)
     parser.add_argument('--eval_num', type=int, default=10)
-    parser.add_argument('--buffer_size', type=int, default=20000)
+    parser.add_argument('--buffer_size', type=int, default=100000)
     parser.add_argument('--batch_size', type=int, default=128)
-    parser.add_argument('--explore_step', type=int, default=2000)
-    parser.add_argument('--max_train_step', type=int, default=50000)
-    parser.add_argument('--learn_id', type=str, default='sac_Pendulum')
+    parser.add_argument('--explore_step', type=int, default=1000)
+    parser.add_argument('--max_train_step', type=int, default=300000)
+    parser.add_argument('--learn_id', type=str, default='dqn_LunarLander')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -44,27 +44,20 @@ if __name__ == '__main__':
                                                    eval_env_num=args.eval_num,
                                                    seed=args.seed,
                                                    dummy=False)
-        
-    # 2.Make agent.
+
     obs_dim = observation_space.shape[0]
-    act_dim = action_space.shape[0]
-    act_bound = action_space.high[0]
+    act_num = action_space.n
 
-    actor = RepapamGaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[128, 128])
-    critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[128, 128])
-    critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[128, 128])
-
-    agent = SACAgent(actor=actor, 
-                     critic1=critic1,
-                     critic2=critic2, 
-                     actor_lr=1e-3,
-                     critic_lr=1e-3,
-                     alpha_lr=3e-4,
-                     tau=0.005,
-                     alpha=0.2,
-                     auto_alpha=True,
+    q_net = QNet(obs_dim=obs_dim, act_num=act_num, hidden_size=[256, 256])
+    agent = DQNAgent(q_net=q_net,
+                     q_lr=1e-3,
+                     initial_eps=0.5,
+                     end_eps=0.01,
+                     eps_decay_period=50000,
+                     eval_eps=0.01,
+                     target_update_freq=100,
                      device=args.device)
-
+    
     # 3.Make Learner and Inferrer.
     if not args.infer:
         if args.train_num == 1:
@@ -82,9 +75,9 @@ if __name__ == '__main__':
                                    agent=agent,
                                    buffer=replaybuffer,
                                    max_train_step=args.max_train_step,
-                                   learner_log_freq=500,
-                                   agent_log_freq=5000,
-                                   eval_freq=1000,
+                                   learner_log_freq=1000,
+                                   agent_log_freq=50000,
+                                   eval_freq=5000,
                                    resume=args.resume)
         learner.learn()
 

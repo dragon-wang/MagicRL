@@ -1,16 +1,18 @@
 import os, sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 import argparse
 import torch
+from torch import nn
 import numpy as np
 import gymnasium
+from gymnasium.spaces import Discrete, Box
 
-from magicrl.agents.modelfree.td3 import TD3Agent
-from magicrl.data.buffers import ReplayBuffer, VectorBuffer
-from magicrl.learner import OffPolicyLearner
+from magicrl.agents.modelfree.ppo import PPO_Agent
+from magicrl.data.buffers import TrajectoryBuffer, VectorBuffer
+from magicrl.learner import OnPolicyLearner
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.continuous import SimpleActor, SimpleCritic
+from magicrl.nn.continuous import GaussionActor, SimpleCritic
 from magicrl.env.maker import make_gymnasium_env, get_gymnasium_space
 
 
@@ -19,11 +21,9 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='Hopper-v4')
     parser.add_argument('--train_num', type=int, default=1)
     parser.add_argument('--eval_num', type=int, default=10)
-    parser.add_argument('--buffer_size', type=int, default=1000000)
-    parser.add_argument('--batch_size', type=int, default=256)
-    parser.add_argument('--explore_step', type=int, default=25000)
-    parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='td3_Hopper')
+    parser.add_argument('--traj_length', type=int, default=2048)
+    parser.add_argument('--max_train_step', type=int, default=2000000)
+    parser.add_argument('--learn_id', type=str, default='ppo_mujoco')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -50,40 +50,44 @@ if __name__ == '__main__':
     act_dim = action_space.shape[0]
     act_bound = action_space.high[0]
 
-    actor = SimpleActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
-    critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
-    critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
+    actor = GaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, 
+                            hidden_size=[64, 64], hidden_activation=nn.Tanh)
+      
+    critic = SimpleCritic(obs_dim=obs_dim, act_dim=0, hidden_size=[64, 64], hidden_activation=nn.Tanh)
 
-    agent = TD3Agent(actor=actor, 
-                     critic1=critic1,
-                     critic2=critic2, 
+
+    agent = PPO_Agent(actor=actor, 
+                     critic=critic,
                      actor_lr=3e-4,
                      critic_lr=3e-4,
-                     tau=0.005,
-                     exploration_noise=0.1,
-                     policy_noise=0.2,
-                     policy_noise_clip=0.5,
-                     policy_delay=2,
+                     gae_lambda=0.95,
+                     gae_normalize=True,
+                     clip_pram=0.2,
+                     ent_coef=0.01,
+                     use_grad_clip=True,
+                     use_lr_decay=True,
+                     train_actor_iters=10,
+                     train_critic_iters=10,
+                     max_train_step=args.max_train_step,
                      device=args.device)
-    
+
     # 3.Make Learner and Inferrer.
     if not args.infer:
         if args.train_num == 1:
-            replaybuffer = ReplayBuffer(buffer_size=args.buffer_size)
+            trajectoryBuffer = TrajectoryBuffer(buffer_size=args.traj_length)
         else:
-            replaybuffer = VectorBuffer(buffer_size=args.buffer_size, 
-                                        buffer_num=args.train_num, 
-                                        buffer_class=ReplayBuffer)
+            trajectoryBuffer = VectorBuffer(buffer_size=args.traj_length  * args.train_num,  # total size of n buffer.
+                                            buffer_num=args.train_num, 
+                                            buffer_class=TrajectoryBuffer)
         
-        learner = OffPolicyLearner(explore_step=args.explore_step,
-                                   batch_size=args.batch_size,
+        learner = OnPolicyLearner( trajectory_length=args.traj_length,
                                    learn_id=args.learn_id,
                                    train_env=train_envs,
                                    eval_env=eval_envs,
                                    agent=agent,
-                                   buffer=replaybuffer,
+                                   buffer=trajectoryBuffer,
                                    max_train_step=args.max_train_step,
-                                   learner_log_freq=1000,
+                                   learner_log_freq=5000,
                                    agent_log_freq=100000,
                                    eval_freq=5000,
                                    resume=args.resume)
