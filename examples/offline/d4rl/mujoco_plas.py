@@ -7,12 +7,11 @@ import d4rl
 import torch
 import numpy as np
 
-from magicrl.agents.offline import BEARAgent
+from magicrl.agents.offline import PLASAgent
 from magicrl.data.buffers import ReplayBuffer
-
-from magicrl.learner import OfflineLearner
+from magicrl.learner import OfflineLearnerPLAS
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.continuous import RepapamGaussionActor, SimpleCritic, CVAE
+from magicrl.nn.continuous import PLASActor, SimpleCritic, CVAE
 from magicrl.utils.data_tools import get_d4rl_dataset
 from magicrl.env.wrapper.common import GymToGymnasium
 from magicrl.env.maker import make_d4rl_env, get_d4rl_space
@@ -22,22 +21,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='hopper-medium-v2')
     parser.add_argument('--eval_num', type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=256)
+    parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='bear/hopper-medium-v2')
+    parser.add_argument('--learn_id', type=str, default='plas/hopper-medium-v2')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--infer', action='store_true', default=False)
     parser.add_argument('--infer_step', type=int, default=-1)
-    # BEAR's parameters
-    parser.add_argument('--mmd_sigma', type=float, default=20.0,
-                        help='the sigma used in mmd kernel')
-    parser.add_argument('--kernel_type', type=str, default='gaussian',
-                        help='the type of mmd kernel(gaussian or laplacian)')
-    parser.add_argument('--lagrange_thresh', type=float, default=0.05,
-                        help='the hyper-parameter used in automatic tuning alpha in cql loss')
-
+    # PLAS's parameters
+    parser.add_argument('--max_cvae_iterations', type=int, default=500000,
+                        help='the num of iterations when training CVAE model')
+    parser.add_argument('--use_ptb', action='store_true', default=False,
+                        help='whether use perturbation layer')
 
     args = parser.parse_args()
 
@@ -58,27 +54,24 @@ if __name__ == '__main__':
     act_dim = action_space.shape[0]
     act_bound = action_space.high[0]
 
-    actor = RepapamGaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
-    critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
-    critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
+    actor = PLASActor(obs_dim=obs_dim, act_dim=act_dim, latent_act_dim=2 * act_dim,
+                      act_bound=act_bound, latent_act_bound=2,
+                      actor_hidden_size=[400, 300], ptb_hidden_size=[400, 300],
+                      use_ptb=args.use_ptb, phi=0.05)
+    critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[400, 300])
+    critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[400, 300])
     cvae = CVAE(obs_dim=obs_dim, act_dim=act_dim, latent_dim=2*act_dim, act_bound=act_bound)
 
-    agent = BEARAgent(actor=actor,
+    agent = PLASAgent(actor=actor,
                       critic1=critic1,
                       critic2=critic2,
-                      cvae=cvae,
+                      cvae=cvae,  
+                      critic_lr=1e-3,
                       actor_lr=1e-4,
-                      critic_lr=3e-4,
-                      cvae_lr=3e-4,
-                      tau=0.05,
-                      lmbda=0.75,  
-                      mmd_sigma=args.mmd_sigma,  
-                      kernel_type=args.kernel_type,  
-                      lagrange_thresh=args.lagrange_thresh, 
-                      n_action_samples=100,  
-                      n_target_samples=10, 
-                      n_mmd_action_samples=4, 
-                      warmup_step=40000,  
+                      cvae_lr=1e-4,
+                      tau=0.005,
+                      lmbda=1,  
+                      max_cvae_iterations=500000, 
                       device=args.device)
     
     # 3.Make Learner and Inferrer.
@@ -86,21 +79,20 @@ if __name__ == '__main__':
         offlinebuffer = ReplayBuffer()
         offlinebuffer.init_offline(*get_d4rl_dataset(gym.make(args.env)))
 
-        learner = OfflineLearner(batch_size=args.batch_size,
-                                 learn_id=args.learn_id,
-                                 eval_env=eval_envs,
-                                 agent=agent,
-                                 buffer=offlinebuffer,
-                                 max_train_step=args.max_train_step,
-                                 learner_log_freq=1000,
-                                 agent_log_freq=100000,
-                                 eval_freq=5000,
-                                 resume=args.resume)
+        learner = OfflineLearnerPLAS(batch_size=args.batch_size,
+                                     learn_id=args.learn_id,
+                                     eval_env=eval_envs,
+                                     agent=agent,
+                                     buffer=offlinebuffer,
+                                     max_train_step=args.max_train_step,
+                                     learner_log_freq=1000,
+                                     agent_log_freq=100000,
+                                     eval_freq=5000,
+                                     resume=args.resume)
         learner.learn()
 
     else:
         infer_env = GymToGymnasium(gym.make(args.env, render_mode='human'))
         inferrer = Inferrer(env=infer_env, agent=agent, learn_id=args.learn_id)
         inferrer.infer(episode_num=10, checkpoint_step=args.infer_step)
-
 

@@ -207,3 +207,48 @@ class OfflineLearner():
         except KeyboardInterrupt:
             print("Saving agent.......")
             agent_logger.log_agent(self.agent, self.agent.train_step)
+
+
+class OfflineLearnerPLAS(OfflineLearner):
+    def learn(self):
+        try:
+            learner_logger = LearnLogger(self.learn_id, self.resume)
+            agent_logger = AgentLogger(self.learn_id ,self.resume)
+            if self.resume:
+                agent_logger.load_agent(self.agent, -1)
+
+            print("==============================start train cvae===================================")
+            while self.agent.cvae_iterations < self.agent.max_cvae_iterations:
+                batch = self.buffer.sample(self.batch_size, device=self.agent.device)
+                cvae_summaries = self.agent.train_cvae(batch)
+                if self.agent.cvae_iterations % self.learner_log_freq == 0:
+                    print("CVAE iteration:", self.agent.cvae_iterations, "\t", "CVAE Loss:", cvae_summaries["cvae_loss"])
+                    learner_logger.log_train_data(cvae_summaries, self.agent.cvae_iterations)
+            
+            print("==============================start train agent===================================")
+            # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
+            while self.agent.train_step < self.max_train_step:
+
+                # sample data from the buffer.
+                batch = self.buffer.sample(self.batch_size, device=self.agent.device)
+
+                # train agent with the sampled data.
+                train_summaries = self.agent.train(batch)
+                self.agent.train_step += 1  # the meaning of 'train_step' here is the same as 'time_step'.
+
+                # log train data.
+                if self.agent.train_step % self.learner_log_freq == 0:
+                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+
+                # log evaluate data.
+                if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
+                    evaluate_summaries = self.evaluator.evaluate()
+                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                
+                # log trained agent.
+                if self.agent.train_step % self.agent_log_freq == 0:
+                    agent_logger.log_agent(self.agent, self.agent.train_step)
+
+        except KeyboardInterrupt:
+            print("Saving agent.......")
+            agent_logger.log_agent(self.agent, self.agent.train_step)

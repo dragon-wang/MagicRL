@@ -292,3 +292,47 @@ class PerturbActor(nn.Module):
         a = torch.tanh(self.mlp(x))
         a = self.phi * self.act_bound * a
         return (a + action).clamp(-self.act_bound, self.act_bound)
+    
+
+class PLASActor(nn.Module):
+    """Used in PLAS.
+    """
+    def __init__(self, 
+                 obs_dim, 
+                 act_dim, 
+                 latent_act_dim, 
+                 act_bound, 
+                 latent_act_bound=2,
+                 actor_hidden_size=[400, 300], 
+                 ptb_hidden_size=[400, 300], 
+                 hidden_activation=nn.ReLU,
+                 use_ptb=False,  # whether use the perturbation layer
+                 phi=0.05  # the Phi in perturbation model:
+                 ):
+        super().__init__()
+        self.actor_mlp = MLP(input_dim=obs_dim, output_dim=latent_act_dim,
+                             hidden_size=actor_hidden_size, hidden_activation=hidden_activation)
+        if use_ptb:
+            self.ptb_mlp = MLP(input_dim=obs_dim + act_dim, output_dim=act_dim,
+                               hidden_size=ptb_hidden_size, hidden_activation=hidden_activation)
+        self.latent_act_bound = latent_act_bound
+        self.act_bound = act_bound
+        self.use_ptb = use_ptb
+        self.phi = phi
+
+    def forward(self, obs, decoder):
+        a = torch.tanh(self.actor_mlp(obs))
+        if self.use_ptb:
+            latent_action = self.latent_act_bound * a
+
+            decode_action = decoder(obs, z=latent_action)
+
+            x = torch.cat([obs, decode_action], dim=1)
+            a = self.phi * torch.tanh(self.ptb_mlp(x))  # different from BCQ
+            ptb_action = (a + decode_action).clamp(-self.act_bound, self.act_bound)
+
+            return ptb_action
+        else:
+            latent_action = self.act_bound * a
+            decode_action = decoder(obs, z=latent_action)
+            return decode_action
