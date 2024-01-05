@@ -7,7 +7,7 @@ import d4rl
 import torch
 import numpy as np
 
-from magicrl.agents.offline import BEARAgent
+from magicrl.agents.offline import CQLAgent
 from magicrl.data.buffers import ReplayBuffer
 from magicrl.learner import OfflineLearner
 from magicrl.learner.interactor import Inferrer
@@ -29,12 +29,18 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--infer', action='store_true', default=False)
     parser.add_argument('--infer_step', type=int, default=-1)
-    # BEAR's parameters
-    parser.add_argument('--mmd_sigma', type=float, default=20.0,
-                        help='the sigma used in mmd kernel')
-    parser.add_argument('--kernel_type', type=str, default='gaussian',
-                        help='the type of mmd kernel(gaussian or laplacian)')
-    parser.add_argument('--lagrange_thresh', type=float, default=0.05,
+    # CQL's parameters
+    parser.add_argument('--auto_alpha_tuning', action='store_true', default=False,
+                        help='whether automatic tune alpha')
+    parser.add_argument('--min_q_weight', type=float, default=5.0,
+                        help='the value of alpha, set to 5.0 or 10.0 if not using lagrange')
+    parser.add_argument('--entropy_backup', action='store_true', default=False,
+                        help='whether use sac style target Q with entropy')
+    parser.add_argument('--max_q_backup', action='store_true', default=False,
+                        help='whether use max q backup')
+    parser.add_argument('--with_lagrange', action='store_true', default=False,
+                        help='whether auto tune alpha in Conservative Q Loss(different from the alpha in sac)')
+    parser.add_argument('--lagrange_thresh', type=float, default=5.0,
                         help='the hyper-parameter used in automatic tuning alpha in cql loss')
 
 
@@ -60,25 +66,21 @@ if __name__ == '__main__':
     actor = RepapamGaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
     critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
     critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
-    cvae = CVAE(obs_dim=obs_dim, act_dim=act_dim, latent_dim=2*act_dim, act_bound=act_bound)
 
-    agent = BEARAgent(actor=actor,
-                      critic1=critic1,
-                      critic2=critic2,
-                      cvae=cvae,
-                      actor_lr=1e-4,
-                      critic_lr=3e-4,
-                      cvae_lr=3e-4,
-                      tau=0.05,
-                      lmbda=0.75,  
-                      mmd_sigma=args.mmd_sigma,  
-                      kernel_type=args.kernel_type,  
-                      lagrange_thresh=args.lagrange_thresh, 
-                      n_action_samples=100,  
-                      n_target_samples=10, 
-                      n_mmd_action_samples=4, 
-                      warmup_step=40000,  
-                      device=args.device)
+    agent = CQLAgent(actor=actor,
+                     critic1=critic1,
+                     critic2=critic2,
+                     actor_lr=1e-4,
+                     critic_lr=3e-4,
+                     tau=0.05,
+                     alpha=0.5,
+                     auto_alpha_tuning=args.auto_alpha_tuning,
+                     min_q_weight=args.min_q_weight,
+                     entropy_backup=args.entropy_backup,
+                     max_q_backup=args.max_q_backup,
+                     with_lagrange=args.with_lagrange,
+                     lagrange_thresh=args.lagrange_thresh,
+                     device=args.device)
     
     # 3.Make Learner and Inferrer.
     if not args.infer:
