@@ -120,8 +120,6 @@ class PLASAgent(BaseAgent):
         soft_target_update(self.critic2, self.target_critic2, tau=self.tau)
         soft_target_update(self.actor, self.target_actor, tau=self.tau)
 
-        self.train_step += 1
-
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
                            "critic_loss_mean": ((critic_loss1 + critic_loss2) / 2).cpu().item()}
 

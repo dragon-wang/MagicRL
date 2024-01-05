@@ -213,8 +213,6 @@ class CQLAgent(BaseAgent):
         soft_target_update(self.critic1, self.target_critic1, tau=self.tau)
         soft_target_update(self.critic2, self.target_critic2, tau=self.tau)
 
-        self.train_step += 1
-        
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
                            "critic_loss_mean": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
                            "alpha_loss": alpha_loss.cpu().item(),

@@ -7,11 +7,11 @@ import d4rl
 import torch
 import numpy as np
 
-from magicrl.agents.offline import CQLAgent
+from magicrl.agents.offline import TD3BCAgent
 from magicrl.data.buffers import ReplayBuffer
 from magicrl.learner import OfflineLearner
 from magicrl.learner.interactor import Inferrer
-from magicrl.nn.continuous import RepapamGaussionActor, SimpleCritic, CVAE
+from magicrl.nn.continuous import SimpleActor, SimpleCritic
 from magicrl.utils.data_tools import get_d4rl_dataset
 from magicrl.env.wrapper.common import GymToGymnasium
 from magicrl.env.maker import make_d4rl_env, get_d4rl_space
@@ -23,25 +23,12 @@ if __name__ == '__main__':
     parser.add_argument('--eval_num', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='cql/hopper-medium-v2')
+    parser.add_argument('--learn_id', type=str, default='td3bc/hopper-medium-v2')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--infer', action='store_true', default=False)
     parser.add_argument('--infer_step', type=int, default=-1)
-    # CQL's parameters
-    parser.add_argument('--auto_alpha_tuning', action='store_true', default=False,
-                        help='whether automatic tune alpha')
-    parser.add_argument('--min_q_weight', type=float, default=5.0,
-                        help='the value of alpha, set to 5.0 or 10.0 if not using lagrange')
-    parser.add_argument('--entropy_backup', action='store_true', default=False,
-                        help='whether use sac style target Q with entropy')
-    parser.add_argument('--max_q_backup', action='store_true', default=False,
-                        help='whether use max q backup')
-    parser.add_argument('--with_lagrange', action='store_true', default=False,
-                        help='whether auto tune alpha in Conservative Q Loss(different from the alpha in sac)')
-    parser.add_argument('--lagrange_thresh', type=float, default=5.0,
-                        help='the hyper-parameter used in automatic tuning alpha in cql loss')
 
 
     args = parser.parse_args()
@@ -63,24 +50,21 @@ if __name__ == '__main__':
     act_dim = action_space.shape[0]
     act_bound = action_space.high[0]
 
-    actor = RepapamGaussionActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
+    actor = SimpleActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
     critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
     critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
 
-    agent = CQLAgent(actor=actor,
-                     critic1=critic1,
-                     critic2=critic2,
-                     actor_lr=1e-4,
-                     critic_lr=3e-4,
-                     tau=0.05,
-                     alpha=0.5,
-                     auto_alpha_tuning=args.auto_alpha_tuning,
-                     min_q_weight=args.min_q_weight,
-                     entropy_backup=args.entropy_backup,
-                     max_q_backup=args.max_q_backup,
-                     with_lagrange=args.with_lagrange,
-                     lagrange_thresh=args.lagrange_thresh,
-                     device=args.device)
+    agent = TD3BCAgent(actor=actor,
+                       critic1=critic1,
+                       critic2=critic2,
+                       actor_lr=3e-4,
+                       critic_lr=3e-4,
+                       tau=0.005,  
+                       policy_noise=0.2,  
+                       noise_clip=0.5,  
+                       policy_delay=2, 
+                       alpha=2.5, 
+                       device=args.device)
     
     # 3.Make Learner and Inferrer.
     if not args.infer:
