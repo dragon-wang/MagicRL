@@ -19,11 +19,13 @@ class DQNAgent(BaseAgent):
                  eps_decay_period=2000,
                  eval_eps=0.001,
                  target_update_freq =10,
+                 double_q=False,
                  **kwargs
                  ):
         super().__init__(**kwargs)
 
         self.target_update_freq = target_update_freq
+        self.double_q = double_q
 
         self.q_net = q_net.to(self.device)
         self.target_q_net = copy.deepcopy(self.q_net).to(self.device)
@@ -56,7 +58,13 @@ class DQNAgent(BaseAgent):
 
         # Compute target Q value
         with torch.no_grad():
-            target_q = rews + (1. - done) * self.gamma * self.target_q_net(next_obs).max(dim=1)[0]
+            if self.double_q:
+                # Double DQN
+                next_acts = self.q_net(next_obs).max(dim=1)[1].unsqueeze(1)  # use Q net to get next actions, rather than target Q net
+                target_q = rews + (1. - done) * self.gamma * self.target_q_net(next_obs).gather(1, next_acts).squeeze(1)
+            else:
+                # Vanilla DQN
+                target_q = rews + (1. - done) * self.gamma * self.target_q_net(next_obs).max(dim=1)[0]
 
         # Compute current Q value
         current_q = self.q_net(obs).gather(1, acts.unsqueeze(-1).long()).squeeze(1)
