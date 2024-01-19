@@ -4,15 +4,15 @@ from magicrl.env import SubprocVectorEnv, DummyVectorEnv
 from magicrl.env.wrapper.common import GymToGymnasium
 
 
-def make_d4rl_env(env_name, eval_env_num, seed, dummy=False):
+def make_d4rl_env(env_name, env_num, seed, dummy=False):
 
     VectorEnv = DummyVectorEnv if dummy else SubprocVectorEnv
 
-    eval_envs = VectorEnv([GymToGymnasium(gym.make(env_name)) for _ in range(eval_env_num)])
+    envs = VectorEnv([GymToGymnasium(gym.make(env_name)) for _ in range(env_num)])
 
-    eval_envs.seed(seed)
+    envs.seed(seed)
 
-    return eval_envs
+    return envs
 
 
 def get_d4rl_space(env_name):

@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_num', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='bcq_hopper-medium-v2')
+    parser.add_argument('--learn_id', type=str, default='bcq/hop-m-v2')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     # 1.Make environment.
     if not args.infer:
         eval_envs = make_d4rl_env(env_name=args.env,
-                                  eval_env_num=args.eval_num,
+                                  env_num=args.eval_num,
                                   seed=args.seed,
                                   dummy=False)
 
