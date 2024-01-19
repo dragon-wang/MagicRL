@@ -45,7 +45,12 @@ class TD3BCAgent(BaseAgent):
         self.noise_clip = noise_clip
         self.policy_delay = policy_delay
         self.alpha = alpha
-
+        
+        self.attr_names.extend(['actor', 'target_actor', 
+                                'critic1', 'target_critic1', 
+                                'critic2', 'target_critic2', 
+                                'actor_optim', 'critic_optim1', 'critic_optim2'])
+        
     def select_action(self, obs, eval=True):
         obs = torch.FloatTensor(obs).to(self.device)
         with torch.no_grad():
