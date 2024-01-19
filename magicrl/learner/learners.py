@@ -148,7 +148,7 @@ class OnPolicyLearner(BaseLearner):
             agent_logger.log_agent(self.agent, self.agent.train_step)
 
 
-class OfflineLearner():
+class OfflineLearner:
     def __init__(self,
                  batch_size,
                  learn_id,  # The name and path to save model and log tensorboard
@@ -235,6 +235,62 @@ class OfflineLearnerPLAS(OfflineLearner):
                 # train agent with the sampled data.
                 train_summaries = self.agent.train(batch)
                 self.agent.train_step += 1  # the meaning of 'train_step' here is the same as 'time_step'.
+
+                # log train data.
+                if self.agent.train_step % self.learner_log_freq == 0:
+                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+
+                # log evaluate data.
+                if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
+                    evaluate_summaries = self.evaluator.evaluate()
+                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                
+                # log trained agent.
+                if self.agent.train_step % self.agent_log_freq == 0:
+                    agent_logger.log_agent(self.agent, self.agent.train_step)
+
+        except KeyboardInterrupt:
+            print("Saving agent.......")
+            agent_logger.log_agent(self.agent, self.agent.train_step)
+
+
+class Off2OnLearner(OffPolicyLearner):
+    """The learner that load offline policy to fine-tune online.
+    """
+    def __init__(self, 
+                 offline_id: str, # The is of trained offline agent.
+                 offline_step: int,  # The checkpoint step of the agent that to be fine tuned.
+                 attr_names: list=None, # Specify what needs to be loaded. 'None' represents loading all.
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.offline_id = offline_id
+        self.offline_step = offline_step
+        self.attr_names = attr_names
+
+    def learn(self):
+        try:
+            learner_logger = LearnLogger(self.learn_id, self.resume)
+            agent_logger = AgentLogger(self.learn_id, self.resume)
+            if self.resume:  # The online data will not be loaded if resume, only the offline data will be loaded.
+                agent_logger.load_agent(self.agent, -1)
+            else:
+                agent_logger_off = AgentLogger(self.offline_id, True)
+                agent_logger_off.load_agent(self.agent, self.offline_step, self.attr_names)  
+            self.collector.collect(n_step=self.explore_step, is_explore=True, random=False)
+
+            print("==============================start train===================================")
+            # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
+            while self.agent.train_step < self.max_train_step:
+
+                # collect data by interacting with the environment.
+                self.collector.collect(n_step=self.collect_per_step)
+
+                # sample data from the buffer.
+                batch = self.buffer.sample(self.batch_size, device=self.agent.device)
+
+                # train agent with the sampled data.
+                train_summaries = self.agent.train(batch)
+                self.agent.train_step += 1  # The "train_step" in Off2OnLearner starts from the "offline_step".
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
