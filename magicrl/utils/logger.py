@@ -57,7 +57,7 @@ class AgentLogger:
         torch.save(checkpoint, checkpoint_path)
         print("The agent is saved in ", checkpoint_path)
 
-    def load_agent(self, agent, step):
+    def load_agent(self, agent, step, attr_names: list=None):
         checkpoint_names = os.listdir(self.agent_log_dir)
         if step < 0:
             checkpoint_name = sorted(checkpoint_names, key=lambda x: int(x.split('.')[0].split('_')[-1]))[-1]
@@ -65,7 +65,7 @@ class AgentLogger:
             checkpoint_name = "checkpoint_" + str(step) + ".pth"
         checkpoint_path = os.path.join(self.agent_log_dir, checkpoint_name)
         checkpoint = torch.load(checkpoint_path, map_location=agent.device)
-        for attr_name in agent.attr_names:
+        for attr_name in attr_names if attr_names is not None else agent.attr_names:
             setattr(agent, attr_name, checkpoint[attr_name])
         print("The agent is loaded from ", checkpoint_path)
 
