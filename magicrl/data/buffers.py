@@ -246,16 +246,31 @@ class ReplayBuffer(BaseBuffer):
             _to_tensor(samples, device, dtype=dtype)
         return samples
 
-    def init_offline(self, offlie_data, data_num):
+    def init_offline(self, offlie_data, data_num, buffer_size=None):
+        """Initiate the ReplayBuffer with offline data.
+        If buffer_size is None, get all data in offlie_data. 
+        If buffer_size < dataset's size, get the offlie_data[:buffer_size].
+        If buffer_size > dataset's size, the offlie_data will be padded with zeros.
+        For the data: 'obs': [a, b, c, d, e, f]
+            buffer_size=None will return 'obs': [a, b, c, d, e, f]
+            buffer_size=3 will return 'obs': [a, b, c]
+            buffer_size=7 will return 'obs': [a, b, c, d, e, f, 0, 0]
+        """
         self._buffer = offlie_data
-        self.buffer_size = data_num
         self._current_size = data_num
-    
-    def pad(self, pad_size):
-        _pad_buffer(self._buffer, pad_size)
-        if self._current_size == self.buffer_size:
-            self._pointer = self.buffer_size + 1
-        self.buffer_size += pad_size
+        self._pointer = 0
+        self.buffer_size = data_num
+        
+        if buffer_size is not None:
+            if buffer_size <= data_num:
+                self._buffer = _get_trans(self._buffer, list(range(buffer_size)))
+                self._current_size = buffer_size
+                self._pointer = 0
+            else:
+                _pad_buffer(self._buffer, pad_size = buffer_size-data_num)
+                self._current_size = data_num
+                self._pointer = data_num
+            self.buffer_size = buffer_size
         
     def save(self):
         # save to hdf5
