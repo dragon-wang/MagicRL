@@ -1,5 +1,4 @@
 import gym
-import d4rl
 
 from magicrl.env import SubprocVectorEnv, DummyVectorEnv
 from magicrl.env.wrapper.common import GymToGymnasium
