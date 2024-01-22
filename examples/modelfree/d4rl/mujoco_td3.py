@@ -8,11 +8,10 @@ import torch
 import numpy as np
 
 from magicrl.agents.modelfree.td3 import TD3Agent
-from magicrl.data.buffers import ReplayBuffer
-from magicrl.learner import Off2OnLearner
+from magicrl.data.buffers import ReplayBuffer, VectorBuffer
+from magicrl.learner import OffPolicyLearner
 from magicrl.learner.interactor import Inferrer
 from magicrl.nn.continuous import SimpleActor, SimpleCritic
-from magicrl.utils.data_tools import get_d4rl_dataset
 from magicrl.env.wrapper.common import GymToGymnasium
 from magicrl.env.maker import make_d4rl_env, get_d4rl_space
 
@@ -20,15 +19,13 @@ from magicrl.env.maker import make_d4rl_env, get_d4rl_space
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='hopper-medium-v2')
+    parser.add_argument('--train_num', type=int, default=1)
     parser.add_argument('--eval_num', type=int, default=10)
-    parser.add_argument('--offline_id', type=str, default='td3bc/hop-m-v2')
-    parser.add_argument('--offline_step', type=int, default=500000)
     parser.add_argument('--buffer_size', type=int, default=1000000)
-    parser.add_argument('--buffer_type', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--explore_step', type=int, default=25000)
     parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='td3ft/hop-m-v2')
+    parser.add_argument('--learn_id', type=str, default='td3/hop-m-v2')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -42,8 +39,8 @@ if __name__ == '__main__':
 
     observation_space, action_space = get_d4rl_space(args.env)
 
-    train_env = make_d4rl_env(env_name=args.env,
-                              env_num=1,
+    train_envs = make_d4rl_env(env_name=args.env,
+                              env_num=args.train_num,
                               seed=args.seed,
                               dummy=True)
     
@@ -52,13 +49,13 @@ if __name__ == '__main__':
         eval_envs = make_d4rl_env(env_name=args.env,
                                   env_num=args.eval_num,
                                   seed=args.seed,
-                                  dummy=False)
-
+                                  dummy=True)
+        
     # 2.Make agent.
     obs_dim = observation_space.shape[0]
     act_dim = action_space.shape[0]
     act_bound = action_space.high[0]
- 
+
     actor = SimpleActor(obs_dim=obs_dim, act_dim=act_dim, act_bound=act_bound, hidden_size=[256, 256])
     critic1 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
     critic2 = SimpleCritic(obs_dim=obs_dim, act_dim=act_dim, hidden_size=[256, 256])
@@ -75,33 +72,27 @@ if __name__ == '__main__':
                      policy_delay=2,
                      device=args.device)
     
-    attr_names=['train_step','actor', 'target_actor', 
-                'critic1', 'target_critic1', 
-                'critic2', 'target_critic2']
-    
     # 3.Make Learner and Inferrer.
-    # buffer_type=1: Initialize an empty ReplayBuffer for online finetune.
-    # buffer_type=2: Initialize an ReplayBuffer with offline data for online finetune.
     if not args.infer:
-        finetunebuffer = ReplayBuffer(buffer_size=args.buffer_size)
-        if args.buffer_type == 2:
-            finetunebuffer.init_offline(*get_d4rl_dataset(gym.make(args.env)), args.buffer_size)
+        if args.train_num == 1:
+            replaybuffer = ReplayBuffer(buffer_size=args.buffer_size)
+        else:
+            replaybuffer = VectorBuffer(buffer_size=args.buffer_size, 
+                                        buffer_num=args.train_num, 
+                                        buffer_class=ReplayBuffer)
         
-        learner = Off2OnLearner(offline_id=args.offline_id,
-                                offline_step=args.offline_step,
-                                attr_names=attr_names,
-                                explore_step=args.explore_step,
-                                batch_size=args.batch_size,
-                                learn_id=args.learn_id,
-                                train_env=train_env,
-                                eval_env=eval_envs,
-                                agent=agent,
-                                buffer=finetunebuffer,
-                                max_train_step=args.max_train_step,
-                                learner_log_freq=1000,
-                                agent_log_freq=100000,
-                                eval_freq=5000,
-                                resume=args.resume)
+        learner = OffPolicyLearner(explore_step=args.explore_step,
+                                   batch_size=args.batch_size,
+                                   learn_id=args.learn_id,
+                                   train_env=train_envs,
+                                   eval_env=eval_envs,
+                                   agent=agent,
+                                   buffer=replaybuffer,
+                                   max_train_step=args.max_train_step,
+                                   learner_log_freq=1000,
+                                   agent_log_freq=100000,
+                                   eval_freq=5000,
+                                   resume=args.resume)
         learner.learn()
 
     else:
