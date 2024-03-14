@@ -77,7 +77,8 @@ if __name__ == '__main__':
     
     attr_names=['train_step','actor', 'target_actor', 
                 'critic1', 'target_critic1', 
-                'critic2', 'target_critic2']
+                'critic2', 'target_critic2',
+                'actor_optim', 'critic_optim1', 'critic_optim2']
     
     # 3.Make Learner and Inferrer.
     # buffer_type=1: Initialize an empty ReplayBuffer for online finetune.
