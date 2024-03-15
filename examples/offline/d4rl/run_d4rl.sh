@@ -100,3 +100,23 @@ python mujoco_td3bc.py --env=walker2d-medium-v2 --learn_id=td3bc/Walker2d-v2/med
 python mujoco_td3bc.py --env=walker2d-expert-v2 --learn_id=td3bc/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
 python mujoco_td3bc.py --env=walker2d-medium-expert-v2 --learn_id=td3bc/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
 python mujoco_td3bc.py --env=walker2d-medium-replay-v2 --learn_id=td3bc/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
+
+# ========================= IQL =========================
+echo "---------IQL in hopper---------"
+python mujoco_iql.py --env=hopper-random-v2 --learn_id=iql/Hopper-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=hopper-medium-v2 --learn_id=iql/Hopper-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=hopper-expert-v2 --learn_id=iql/Hopper-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=hopper-medium-expert-v2 --learn_id=iql/Hopper-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=hopper-medium-replay-v2 --learn_id=iql/Hopper-v2/medium/seed10 --seed=10 --device=cuda
+echo "--------Run IQL in halfcheetah---------"
+python mujoco_iql.py --env=halfcheetah-random-v2 --learn_id=iql/HalfCheetah-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=halfcheetah-medium-v2 --learn_id=iql/HalfCheetah-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=halfcheetah-expert-v2 --learn_id=iql/HalfCheetah-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=halfcheetah-medium-expert-v2 --learn_id=iql/HalfCheetah-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=halfcheetah-medium-replay-v2 --learn_id=iql/HalfCheetah-v2/medium/seed10 --seed=10 --device=cuda
+echo "--------Run IQL in walker2d---------"
+python mujoco_iql.py --env=walker2d-random-v2 --learn_id=iql/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=walker2d-medium-v2 --learn_id=iql/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=walker2d-expert-v2 --learn_id=iql/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=walker2d-medium-expert-v2 --learn_id=iql/Walker2d-v2/medium/seed10 --seed=10 --device=cuda
+python mujoco_iql.py --env=walker2d-medium-replay-v2 --learn_id=iql/Walker2d-v2/medium/seed10 --seed=10 --device=cuda

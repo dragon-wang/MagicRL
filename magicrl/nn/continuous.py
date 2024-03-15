@@ -143,6 +143,9 @@ class GaussionActor(nn.Module):
                  act_bound: float, 
                  hidden_size: List[int], 
                  hidden_activation=nn.Tanh,
+                 logstd_min=None,
+                 logstd_max=None,
+                 logstd_hard_clip=True,
                  feature_net: BaseFeatureNet=None) -> None:
         super().__init__()
         
@@ -158,7 +161,9 @@ class GaussionActor(nn.Module):
 
         self.act_bound = act_bound
         self.act_dim = act_dim
-
+        self.logstd_min = logstd_min
+        self.logstd_max = logstd_max
+        self.logstd_hard_clip = logstd_hard_clip
 
     def forward(self, obs):
         x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
@@ -174,11 +179,18 @@ class GaussionActor(nn.Module):
     
     def get_logprob_entropy(self, obs, act):
         x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
-
         mu = self.fc_mu(x)
-        std = torch.exp(self.log_std)
-        dist = Normal(mu, std)
 
+        if self.logstd_min is not None:
+            if self.logstd_hard_clip:
+                log_std = torch.clip(self.log_std, self.logstd_min, self.logstd_max)
+            else:
+                log_std = self.logstd_min + torch.sigmoid(self.log_std) * (self.logstd_max - self.logstd_min)
+            std = torch.exp(log_std)
+        else:
+            std = torch.exp(self.log_std)
+            
+        dist = Normal(mu, std)
         log_prob = dist.log_prob(act).sum(1)
         entropy = dist.entropy().sum(1)
 
