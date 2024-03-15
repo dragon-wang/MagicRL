@@ -119,7 +119,7 @@ class IQLAgent(BaseAgent):
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
                            "critic_q_loss": ((critic_q1_loss + critic_q2_loss) / 2).cpu().item(),
                            "critic_v_loss": critic_v_loss.cpu().item(),
-                           "critic_q_value": ((q1.mean() + q2.mean())/2).cpu().item(),
-                           "cirtic_v_value":v.mean().cpu().item()}
+                           "q_mean": ((q1.mean() + q2.mean())/2).cpu().item(),
+                           "v_mean":v.mean().cpu().item()}
 
         return train_summaries

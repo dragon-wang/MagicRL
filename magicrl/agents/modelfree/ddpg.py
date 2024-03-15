@@ -57,14 +57,14 @@ class DDPGAgent(BaseAgent):
         # Compute target Q value
         with torch.no_grad():
             next_act = self.target_actor(next_obs)
-            next_Q = self.target_critic(next_obs, next_act).squeeze(1)
-            target_Q = rews + (1. - done) * self.gamma * next_Q
+            next_q = self.target_critic(next_obs, next_act).squeeze(1)
+            target_q = rews + (1. - done) * self.gamma * next_q
 
         # Compute current Q
-        current_Q = self.critic(obs, acts).squeeze(1)
+        current_q = self.critic(obs, acts).squeeze(1)
 
         # Compute critic loss
-        critic_loss = F.mse_loss(current_Q, target_Q)
+        critic_loss = F.mse_loss(current_q, target_q)
 
         # Compute actor loss
         actor_loss = -self.critic(obs, self.actor(obs)).mean()
@@ -83,5 +83,6 @@ class DDPGAgent(BaseAgent):
         soft_target_update(self.critic, self.target_critic, tau=self.tau)
 
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
-                           "critic_loss": critic_loss.cpu().item()}
+                           "critic_loss": critic_loss.cpu().item(),
+                           "q_mean": current_q.mean().cpu().item()}
         return train_summaries

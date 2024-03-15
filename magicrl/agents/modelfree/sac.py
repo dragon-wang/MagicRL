@@ -113,8 +113,9 @@ class SACAgent(BaseAgent):
         soft_target_update(self.critic2, self.target_critic2, tau=self.tau)
 
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
-                           "critic_loss_mean": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
-                           "alpha_loss": alpha_loss.cpu().item()}
+                           "critic_loss": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
+                           "alpha_loss": alpha_loss.cpu().item(),
+                           "q_mean": ((q1.mean() + q2.mean())/2).cpu().item()}
 
         return train_summaries
 

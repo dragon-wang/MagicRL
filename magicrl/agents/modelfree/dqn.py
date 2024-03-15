@@ -82,6 +82,7 @@ class DQNAgent(BaseAgent):
         if self.train_step % self.target_update_freq == 0:
             hard_target_update(self.q_net, self.target_q_net)
 
-        train_summaries = {"q_loss": q_loss.cpu().item()}
+        train_summaries = {"q_loss": q_loss.cpu().item(),
+                           "q_mean": current_q.mean().cpu().item()}
 
         return train_summaries

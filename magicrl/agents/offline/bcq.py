@@ -124,7 +124,8 @@ class BCQAgent(BaseAgent):
         soft_target_update(self.perturb, self.target_perturb, tau=self.tau)
 
         train_summaries = {"cvae_loss": cvae_loss.cpu().item(),
-                           "critic_loss_mean": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
-                           "perturbation_loss": perturbation_loss.cpu().item()}
+                           "critic_loss": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
+                           "perturbation_loss": perturbation_loss.cpu().item(),
+                           "q_mean": ((current_q1.mean() + current_q2.mean())/2).cpu().item()}
 
         return train_summaries

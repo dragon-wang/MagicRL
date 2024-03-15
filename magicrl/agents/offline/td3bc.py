@@ -108,7 +108,8 @@ class TD3BCAgent(BaseAgent):
             actor_loss = torch.tensor(0)
 
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
-                           "critic_loss_mean": ((critic_loss1 + critic_loss2) / 2).cpu().item()}
+                           "critic_loss": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
+                           "q_mean": ((current_q1.mean() + current_q2.mean())/2).cpu().item()}
 
 
         return train_summaries

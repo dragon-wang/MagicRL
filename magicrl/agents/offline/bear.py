@@ -197,7 +197,8 @@ class BEARAgent(BaseAgent):
 
         train_summaries = {"cvae_loss": cvae_loss.cpu().item(),
                            "actor_loss": policy_loss.cpu().item(),
-                           "critic_loss_mean": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
-                           "alpha_prime_loss": alpha_prime_loss.cpu().item()}
+                           "critic_loss": ((critic_loss1 + critic_loss2) / 2).cpu().item(),
+                           "alpha_prime_loss": alpha_prime_loss.cpu().item(),
+                           "q_mean": ((current_q1.mean() + current_q2.mean())/2).cpu().item()}
 
         return train_summaries

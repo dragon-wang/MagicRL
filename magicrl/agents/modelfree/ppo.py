@@ -105,6 +105,7 @@ class PPO_Agent(BaseAgent):
 
         train_summaries = {"actor_loss": actor_loss.cpu().item(),
                            "critic_loss": critic_loss.cpu().item(),
-                           "entropy": entropy_loss.cpu().item()}
+                           "entropy": entropy_loss.cpu().item(),
+                           'v_mean': values.mean().cpu().item()}
 
         return train_summaries 
