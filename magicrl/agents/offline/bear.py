@@ -73,7 +73,7 @@ class BEARAgent(BaseAgent):
             obs = torch.FloatTensor(obs).to(self.device)
             obs = torch.repeat_interleave(obs, repeats=self.n_action_samples, dim=0)
 
-            action, _, _ = self.actor(obs)
+            action, _ = self.actor.sample(obs, deterministic=eval)
             q1 = self.critic1(obs, action)
 
             ind = q1.reshape(obs_len, self.n_action_samples, 1).argmax(1).squeeze().cpu()
@@ -132,8 +132,8 @@ class BEARAgent(BaseAgent):
             # generate 10 actions for every next_obs(Same as BCQ)
             next_obs = torch.repeat_interleave(next_obs, repeats=self.n_target_samples, dim=0).to(self.device)
             # compute target Q value of generated action
-            target_q1 = self.target_critic1(next_obs, self.actor(next_obs)[0])
-            target_q2 = self.target_critic2(next_obs, self.actor(next_obs)[0])
+            target_q1 = self.target_critic1(next_obs, self.actor.sample(next_obs)[0])
+            target_q2 = self.target_critic2(next_obs, self.actor.sample(next_obs)[0])
             # soft clipped double q-learning
             target_q = self.lmbda * torch.min(target_q1, target_q2) + (1. - self.lmbda) * torch.max(target_q1, target_q2)
             # take max over each action sampled from the generation and perturbation model
@@ -179,7 +179,7 @@ class BEARAgent(BaseAgent):
         Actor Training
         Actor Loss = alpha_prime * MMD Loss + -minQ(s,a)
         """
-        a, log_prob, _ = self.actor(obs)
+        a, log_prob = self.actor.sample(obs)
         min_q = torch.min(self.critic1(obs, a), self.critic2(obs, a)).squeeze(1)
         # policy_loss = (self.alpha * log_prob - min_q).mean()  # SAC Type
         policy_loss = - (min_q.mean())

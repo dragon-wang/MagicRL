@@ -74,8 +74,9 @@ class CQLAgent(BaseAgent):
     def select_action(self, obs, eval=True):
         with torch.no_grad():
             obs = torch.FloatTensor(obs).to(self.device)
-            _, _, mu_action = self.actor(obs)
-        return mu_action.cpu().numpy()
+            action, _ = self.actor.sample(obs, deterministic=eval)
+            
+        return action.cpu().numpy()
 
     def get_policy_actions(self, obs, n_action_samples):
         """
@@ -85,7 +86,7 @@ class CQLAgent(BaseAgent):
         """
         obs_temp = torch.repeat_interleave(obs, n_action_samples, dim=0).to(self.device)
         with torch.no_grad():
-            actions, log_probs, _ = self.actor(obs_temp)
+            actions, log_probs = self.actor.sample(obs_temp)
         return actions, log_probs.reshape(obs.shape[0], n_action_samples, 1)
 
     def get_actions_values(self, obs, actions, n_action_samples, q_net):
@@ -109,7 +110,7 @@ class CQLAgent(BaseAgent):
         SAC Loss
         """
         # compute policy Loss
-        a, log_prob, _ = self.actor(obs)
+        a, log_prob = self.actor.sample(obs)
         min_q = torch.min(self.critic1(obs, a), self.critic2(obs, a)).squeeze(1)
         actor_loss = (self.alpha * log_prob - min_q).mean()
 
@@ -118,7 +119,7 @@ class CQLAgent(BaseAgent):
         q2 = self.critic2(obs, acts).squeeze(1)
         with torch.no_grad():
             if not self.max_q_backup:
-                next_a, next_log_prob, _ = self.actor(next_obs)
+                next_a, next_log_prob = self.actor.sample(next_obs)
                 min_target_next_q = torch.min(self.target_critic1(next_obs, next_a),
                                               self.target_critic2(next_obs, next_a)).squeeze(1)
                 if self.entropy_backup:

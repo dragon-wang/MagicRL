@@ -54,10 +54,7 @@ class PPO_Agent(BaseAgent):
     def select_action(self, obs, eval=False):
         with torch.no_grad():
             obs = torch.FloatTensor(obs).to(self.device)
-            action, eval_action = self.actor(obs)
-
-            if eval:
-                action = eval_action 
+            action, _ = self.actor.sample(obs, deterministic=eval)
 
         return action.cpu().numpy()
     

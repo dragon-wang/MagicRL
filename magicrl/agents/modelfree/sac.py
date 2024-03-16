@@ -55,10 +55,7 @@ class SACAgent(BaseAgent):
     def select_action(self, obs, eval=False):
         with torch.no_grad():
             obs = torch.FloatTensor(obs).to(self.device)
-            action, log_prob, mu_action = self.actor(obs)
-
-            if eval:
-                action = mu_action  # if eval, use mu as the action
+            action, _ = self.actor.sample(obs, deterministic=eval)
 
         return action.cpu().numpy()
 
@@ -67,7 +64,7 @@ class SACAgent(BaseAgent):
         obs, acts, rews, next_obs, done = batch['obs'], batch['act'], batch['rew'], batch['next_obs'], batch['done']
 
         # compute actor Loss
-        a, log_prob, _ = self.actor(obs)
+        a, log_prob = self.actor.sample(obs)
         min_q = torch.min(self.critic1(obs, a), self.critic2(obs, a)).squeeze(1)
         actor_loss = (self.alpha * log_prob - min_q).mean()
 
@@ -75,7 +72,7 @@ class SACAgent(BaseAgent):
         q1 = self.critic1(obs, acts).squeeze(1)
         q2 = self.critic2(obs, acts).squeeze(1)
         with torch.no_grad():
-            next_a, next_log_prob, _ = self.actor(next_obs)
+            next_a, next_log_prob = self.actor.sample(next_obs)
             min_target_next_q = torch.min(self.target_critic1(next_obs, next_a), self.target_critic2(next_obs, next_a)).squeeze(1)
             y = rews + self.gamma * (1. - done) * (min_target_next_q - self.alpha * next_log_prob)
 

@@ -10,10 +10,6 @@ from magicrl.nn.common import MLP
 from magicrl.nn.feature import BaseFeatureNet
 
 
-LOG_STD_MIN = -20
-LOG_STD_MAX = 2
-
-
 """
 The network in MagicRL is like:
     obs -> feature_net -> mlp -> act or Q
@@ -87,6 +83,9 @@ class RepapamGaussionActor(nn.Module):
                  act_bound: float, 
                  hidden_size: List[int], 
                  hidden_activation=nn.ReLU,
+                 logstd_min=-20,
+                 logstd_max=2,
+                 logstd_hard_clip=True,
                  feature_net: BaseFeatureNet=None) -> None:
         super().__init__()
         
@@ -102,35 +101,43 @@ class RepapamGaussionActor(nn.Module):
 
         self.act_bound = act_bound
         self.act_dim = act_dim
+        self.logstd_min = logstd_min
+        self.logstd_max = logstd_max
+        self.logstd_hard_clip = logstd_hard_clip
 
         self._eps = np.finfo(np.float32).eps.item()
 
     def forward(self, obs):
         x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
-
         mu = self.fc_mu(x)
-        log_std = self.fc_log_std(x).clamp(LOG_STD_MIN, LOG_STD_MAX)
+        log_std = self.fc_log_std(x)
+
+        if self.logstd_min is not None:
+            if self.logstd_hard_clip:
+                log_std = torch.clip(log_std, self.logstd_min, self.logstd_max)
+            else:
+                log_std = self.logstd_min + torch.sigmoid(log_std) * (self.logstd_max - self.logstd_min)
         std = torch.exp(log_std)
-
         dist = Normal(mu, std)
-        raw_act = dist.rsample()
-        squashed_act = torch.tanh(raw_act)
 
-        act = self.act_bound * squashed_act
-        log_prob = torch.sum(dist.log_prob(raw_act) - torch.log(1 - squashed_act.pow(2) + self._eps), dim=1)
+        return dist
 
-        mu_act = self.act_bound * torch.tanh(mu)  # used in evaluation and inference.
+    def sample(self, obs, deterministic=False):
+        """Sample actions from dist with reparameterization.
+        deterministic=False when collecting data,
+        deterministic=True  when evaluating agent.
+        """
+        dist = self.forward(obs)
+        if deterministic:
+            act, log_prob = dist.mean, None
+        else:
+            act = dist.rsample()
+            log_prob = torch.sum(dist.log_prob(act) - torch.log(1 - torch.tanh(act).pow(2) + self._eps), dim=1)
 
-        return act, log_prob, mu_act
-
+        return self.act_bound * torch.tanh(act), log_prob  # act: (n, m); log_prob: (n, )
+    
     def sample_multiple_without_squash(self, obs, sample_num):
-        x =  self.mlp(obs) if self.feature_net is  None else self.mlp(self.feature_net(obs))
-
-        mu = self.fc_mu(x)
-        log_std = self.fc_log_std(x).clamp(LOG_STD_MIN, LOG_STD_MAX)
-        std = torch.exp(log_std)
-
-        dist = Normal(mu, std)
+        dist = self.forward(obs)
         raw_act = dist.rsample((sample_num, ))
 
         return raw_act.transpose(0, 1)  # N x B X D -> B x N x D (N:sample num, B:batch size, D:action dim)
@@ -167,18 +174,6 @@ class GaussionActor(nn.Module):
 
     def forward(self, obs):
         x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
-
-        mu = self.fc_mu(x)
-        std = torch.exp(self.log_std)
-        dist = Normal(mu, std)
-
-        act = dist.sample().clip(-self.act_bound, self.act_bound)
-        mu_act = mu.clip(-self.act_bound, self.act_bound)
-
-        return act, mu_act
-    
-    def get_logprob_entropy(self, obs, act):
-        x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
         mu = self.fc_mu(x)
 
         if self.logstd_min is not None:
@@ -189,13 +184,31 @@ class GaussionActor(nn.Module):
             std = torch.exp(log_std)
         else:
             std = torch.exp(self.log_std)
-            
+        
         dist = Normal(mu, std)
+        return dist
+    
+    def get_logprob_entropy(self, obs, act):
+        dist = self.forward(obs)
         log_prob = dist.log_prob(act).sum(1)
         entropy = dist.entropy().sum(1)
 
-        return log_prob, entropy  # act: (n, m) -> log_prob: (n, ); entropy: (n, )
+        return log_prob, entropy  # log_prob: (n, ); entropy: (n, )
     
+    def sample(self, obs, deterministic=False):
+        """Sample actions from dist without reparameterization.
+        deterministic=False when collecting data,
+        deterministic=True  when evaluating agent.
+        """
+        dist = self.forward(obs)
+        if deterministic:
+            act, log_prob = dist.mean, None
+        else:
+            act = dist.sample()
+            log_prob = dist.log_prob(act).sum(1)
+        
+        return act.clip(-self.act_bound, self.act_bound), log_prob  # act: (n, m); log_prob: (n, )
+ 
 
 class CVAE(nn.Module):
     """

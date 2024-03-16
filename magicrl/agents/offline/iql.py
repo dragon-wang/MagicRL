@@ -49,13 +49,10 @@ class IQLAgent(BaseAgent):
                                 'actor_optim', 'critic_q1_optim', 'critic_q2_optim', 'critic_v_optim'])
 
 
-    def select_action(self, obs, eval=False):
+    def select_action(self, obs, eval=True):
         with torch.no_grad():
             obs = torch.FloatTensor(obs).to(self.device)
-            action, eval_action = self.actor(obs)
-
-            if eval:
-                action = eval_action 
+            action, _ = self.actor.sample(obs, deterministic=eval)
 
         return action.cpu().numpy()
 
