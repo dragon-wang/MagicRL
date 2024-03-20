@@ -272,6 +272,8 @@ class ReplayBuffer(BaseBuffer):
                 self._pointer = data_num
             self.buffer_size = buffer_size
         
+        print(f"The offline data num is: {data_num}, and the buffer_size is: {self.buffer_size}.")
+        
     def save(self):
         # save to hdf5
         pass

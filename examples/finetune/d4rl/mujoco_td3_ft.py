@@ -24,16 +24,18 @@ if __name__ == '__main__':
     parser.add_argument('--offline_id', type=str, default='td3bc/hop-m-v2')
     parser.add_argument('--offline_step', type=int, default=500000)
     parser.add_argument('--buffer_size', type=int, default=1000000)
-    parser.add_argument('--buffer_type', type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--explore_step', type=int, default=25000)
     parser.add_argument('--max_train_step', type=int, default=1000000)
-    parser.add_argument('--learn_id', type=str, default='td3ft/hop-m-v2')
+    parser.add_argument('--learn_id', type=str, default='finetune/hop-m-v2/ft/td3/test')
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--seed', type=int, default=10)
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--infer', action='store_true', default=False)
     parser.add_argument('--infer_step', type=int, default=-1)
+
+    parser.add_argument('--buffer_type', type=int, default=1)
+    parser.add_argument('--no_optim', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -77,16 +79,21 @@ if __name__ == '__main__':
     
     attr_names=['train_step','actor', 'target_actor', 
                 'critic1', 'target_critic1', 
-                'critic2', 'target_critic2',
-                'actor_optim', 'critic_optim1', 'critic_optim2']
+                'critic2', 'target_critic2']
+    
+    if not args.no_optim:
+        attr_names.extend(['actor_optim', 'critic_optim1', 'critic_optim2'])
     
     # 3.Make Learner and Inferrer.
     # buffer_type=1: Initialize an empty ReplayBuffer for online finetune.
-    # buffer_type=2: Initialize an ReplayBuffer with offline data for online finetune.
+    # buffer_type=2: Initialize an ReplayBuffer with offline data for online finetune. (The offline data will be replaced.)
+    # buffer_type=3: Initialize an ReplayBuffer with offline data for online finetune. (The offline data will not be replaced.)
     if not args.infer:
         finetunebuffer = ReplayBuffer(buffer_size=args.buffer_size)
         if args.buffer_type == 2:
             finetunebuffer.init_offline(*get_d4rl_dataset(gym.make(args.env)), args.buffer_size)
+        elif args.buffer_type == 3:
+            finetunebuffer.init_offline(*get_d4rl_dataset(gym.make(args.env)), args.buffer_size+500000)
         
         learner = Off2OnLearner(offline_id=args.offline_id,
                                 offline_step=args.offline_step,
