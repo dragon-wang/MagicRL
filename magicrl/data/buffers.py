@@ -148,21 +148,21 @@ def _pad_buffer(buffer: Dict, pad_size: int):
                      "vector_1": [b, 0, 0, 0, 0]
     "act":  [c, 0, 0, 0, 0]
     "rew":  [d, 0, 0, 0, 0]
-    "done": [e, 0, 0, 0, 0]
+    "done": [e, F, F, F, F]
 
     After call _pad_buffer(buffer, 2), the buffer is:
-    "obs": "vector": "vector_0": [a, f, 0, 0, 0, 0, 0]
-                     "vector_1": [b, g, 0, 0, 0, 0, 0]
-    "act":  [c, h, 0, 0, 0, 0, 0]
-    "rew":  [d, i, 0, 0, 0, 0, 0]
-    "done": [e, j, 0, 0, 0, 0, 0]
+    "obs": "vector": "vector_0": [a, 0, 0, 0, 0, 0, 0]
+                     "vector_1": [b, 0, 0, 0, 0, 0, 0]
+    "act":  [c, 0, 0, 0, 0, 0, 0]
+    "rew":  [d, 0, 0, 0, 0, 0, 0]
+    "done": [e, F, F, F, F, F, F]
 
     The new buffer_size is 7.
     """
     for k, v in buffer.items():
         if not isinstance(v, Dict):
             shp = (pad_size, *buffer[k].shape[1:])
-            buffer[k] = np.concatenate((buffer[k], np.zeros(shp)), axis=0)
+            buffer[k] = np.concatenate((buffer[k], np.zeros(shp, dtype=buffer[k].dtype)), axis=0)
         else:
             _pad_buffer(buffer[k], pad_size)
 
@@ -268,6 +268,7 @@ class ReplayBuffer(BaseBuffer):
                 self._pointer = 0
             else:
                 _pad_buffer(self._buffer, pad_size = buffer_size-data_num)
+                self.episode_steps = np.concatenate((self.episode_steps, np.zeros(buffer_size-data_num, dtype=np.int32)))
                 self._current_size = data_num
                 self._pointer = data_num
             self.buffer_size = buffer_size
