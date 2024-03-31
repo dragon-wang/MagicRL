@@ -35,6 +35,9 @@ class BaseLearner(ABC):
         self.collector = Collector(self.train_env, self.agent, self.buffer)
         self.evaluator = Evaluator(self.eval_env, self.agent)
 
+        self.learner_logger = LearnLogger(self.learn_id, self.resume)
+        self.agent_logger = AgentLogger(self.learn_id ,self.resume)
+
     @abstractmethod
     def learn(self):
         pass  
@@ -54,10 +57,8 @@ class OffPolicyLearner(BaseLearner):
 
     def learn(self):
         try:
-            learner_logger = LearnLogger(self.learn_id, self.resume)
-            agent_logger = AgentLogger(self.learn_id ,self.resume)
             if self.resume:
-                agent_logger.load_agent(self.agent, -1)
+                self.agent_logger.load_agent(self.agent, -1)
                 self.collector.collect(n_step=self.explore_step, is_explore=True, random=False)
             else:
                 self.collector.collect(n_step=self.explore_step, is_explore=True, random=True)
@@ -78,20 +79,20 @@ class OffPolicyLearner(BaseLearner):
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
-                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+                    self.learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
                 # log evaluate data.
                 if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
                     evaluate_summaries = self.evaluator.evaluate()
-                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                    self.learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
                 
                 # log trained agent.
                 if self.agent.train_step % self.agent_log_freq == 0:
-                    agent_logger.log_agent(self.agent, self.agent.train_step)
+                    self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
         except KeyboardInterrupt:
             print("Saving agent.......")
-            agent_logger.log_agent(self.agent, self.agent.train_step)
+            self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
 
 class OnPolicyLearner(BaseLearner):
@@ -104,10 +105,8 @@ class OnPolicyLearner(BaseLearner):
 
     def learn(self):
         try:
-            learner_logger = LearnLogger(self.learn_id, self.resume)
-            agent_logger = AgentLogger(self.learn_id ,self.resume)
             if self.resume:
-                agent_logger.load_agent(self.agent, -1)
+                self.agent_logger.load_agent(self.agent, -1)
 
             print("==============================start train===================================")
             # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
@@ -132,20 +131,20 @@ class OnPolicyLearner(BaseLearner):
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
-                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+                    self.learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
                 # log evaluate data.
                 if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
                     evaluate_summaries = self.evaluator.evaluate()
-                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                    self.learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
                 
                 # log trained agent.
                 if self.agent.train_step % self.agent_log_freq == 0:
-                    agent_logger.log_agent(self.agent, self.agent.train_step)
+                    self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
         except KeyboardInterrupt:
             print("Saving agent.......")
-            agent_logger.log_agent(self.agent, self.agent.train_step)
+            self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
 
 class OfflineLearner:
@@ -173,12 +172,13 @@ class OfflineLearner:
         self.resume = resume
         self.evaluator = Evaluator(self.eval_env, self.agent)
 
+        self.learner_logger = LearnLogger(self.learn_id, self.resume)
+        self.agent_logger = AgentLogger(self.learn_id ,self.resume)
+
     def learn(self):
         try:
-            learner_logger = LearnLogger(self.learn_id, self.resume)
-            agent_logger = AgentLogger(self.learn_id ,self.resume)
             if self.resume:
-                agent_logger.load_agent(self.agent, -1)
+                self.agent_logger.load_agent(self.agent, -1)
 
             print("==============================start train===================================")
             # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
@@ -193,29 +193,27 @@ class OfflineLearner:
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
-                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+                    self.learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
                 # log evaluate data.
                 if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
                     evaluate_summaries = self.evaluator.evaluate()
-                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                    self.learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
                 
                 # log trained agent.
                 if self.agent.train_step % self.agent_log_freq == 0:
-                    agent_logger.log_agent(self.agent, self.agent.train_step)
+                    self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
         except KeyboardInterrupt:
             print("Saving agent.......")
-            agent_logger.log_agent(self.agent, self.agent.train_step)
+            self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
 
 class OfflineLearnerPLAS(OfflineLearner):
     def learn(self):
         try:
-            learner_logger = LearnLogger(self.learn_id, self.resume)
-            agent_logger = AgentLogger(self.learn_id ,self.resume)
             if self.resume:
-                agent_logger.load_agent(self.agent, -1)
+                self.agent_logger.load_agent(self.agent, -1)
 
             print("==============================start train cvae===================================")
             while self.agent.cvae_iterations < self.agent.max_cvae_iterations:
@@ -223,7 +221,7 @@ class OfflineLearnerPLAS(OfflineLearner):
                 cvae_summaries = self.agent.train_cvae(batch)
                 if self.agent.cvae_iterations % self.learner_log_freq == 0:
                     print("CVAE iteration:", self.agent.cvae_iterations, "\t", "CVAE Loss:", cvae_summaries["cvae_loss"])
-                    learner_logger.log_train_data(cvae_summaries, self.agent.cvae_iterations)
+                    self.learner_logger.log_train_data(cvae_summaries, self.agent.cvae_iterations)
             
             print("==============================start train agent===================================")
             # The main loop of "choose action -> act action -> add buffer -> train policy -> log data"
@@ -238,20 +236,20 @@ class OfflineLearnerPLAS(OfflineLearner):
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
-                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+                    self.learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
                 # log evaluate data.
                 if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
                     evaluate_summaries = self.evaluator.evaluate()
-                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                    self.learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
                 
                 # log trained agent.
                 if self.agent.train_step % self.agent_log_freq == 0:
-                    agent_logger.log_agent(self.agent, self.agent.train_step)
+                    self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
         except KeyboardInterrupt:
             print("Saving agent.......")
-            agent_logger.log_agent(self.agent, self.agent.train_step)
+            self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
 
 class Off2OnLearner(OffPolicyLearner):
@@ -269,10 +267,8 @@ class Off2OnLearner(OffPolicyLearner):
 
     def learn(self):
         try:
-            learner_logger = LearnLogger(self.learn_id, self.resume)
-            agent_logger = AgentLogger(self.learn_id, self.resume)
             if self.resume:  # The online data will not be loaded if resume, only the offline data will be loaded.
-                agent_logger.load_agent(self.agent, -1)
+                self.agent_logger.load_agent(self.agent, -1)
             else:
                 agent_logger_off = AgentLogger(self.offline_id, True)
                 agent_logger_off.load_agent(self.agent, self.offline_step, self.attr_names)  
@@ -294,17 +290,17 @@ class Off2OnLearner(OffPolicyLearner):
 
                 # log train data.
                 if self.agent.train_step % self.learner_log_freq == 0:
-                    learner_logger.log_train_data(train_summaries, self.agent.train_step)
+                    self.learner_logger.log_train_data(train_summaries, self.agent.train_step)
 
                 # log evaluate data.
                 if self.eval_freq > 0 and self.agent.train_step % self.eval_freq == 0:
                     evaluate_summaries = self.evaluator.evaluate()
-                    learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
+                    self.learner_logger.log_eval_data(evaluate_summaries, self.agent.train_step)
                 
                 # log trained agent.
                 if self.agent.train_step % self.agent_log_freq == 0:
-                    agent_logger.log_agent(self.agent, self.agent.train_step)
+                    self.agent_logger.log_agent(self.agent, self.agent.train_step)
 
         except KeyboardInterrupt:
             print("Saving agent.......")
-            agent_logger.log_agent(self.agent, self.agent.train_step)
+            self.agent_logger.log_agent(self.agent, self.agent.train_step)
