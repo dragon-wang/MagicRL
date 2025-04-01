@@ -13,7 +13,7 @@ def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
                      "vector_1": np.ndarray (a2,)
                      ...
            "visual": "visual_0": np.ndarray (b1, c1)
-                     "visual_0": np.ndarray (b2, c2)
+                     "visual_1": np.ndarray (b2, c2)
                      ...
     "act": "discrete": np.ndarray ()  # scalar
            "continuous": np.ndarray (d1, )
@@ -27,7 +27,7 @@ def _build_buffer(buffer: Dict, transition: Dict, buffer_size):
                      "vector_1": np.empty (n, a2)
                      ...
            "visual": "visual_0": np.empty (n, b1, c1)
-                     "visual_0": np.empty (n, b2, c2)
+                     "visual_1": np.empty (n, b2, c2)
                      ...
     "act": "discrete": np.empty (n, )
            "continuous": np.empty (n, d1)
@@ -90,7 +90,7 @@ def _add_tran(buffer: Dict, transition: Dict, index=1):
 
 
 def _get_trans(buffer: Dict, index: Union[int, Sequence[int]]):
-    """Get one or several transitions from the buffer according to the index
+    """Get one or several transitions from the buffer according to the index.
     If index is i, the result will squeeze the dim;
     If index is [i] or [i,j], the result will not squeeze the dim;
 
@@ -360,7 +360,7 @@ class TrajectoryBuffer(BaseBuffer):
 class VectorBuffer:
     def __init__(self, 
                  buffer_size: int, # The size of total buffer.
-                 buffer_num: int,  # The number of buffer in cector buffers.
+                 buffer_num: int,  # The number of buffer in vector buffers.
                  buffer_class: BaseBuffer):
         self.buffer_size = buffer_size
         self.buffer_num = buffer_num
