@@ -338,7 +338,7 @@ class TrajectoryBuffer(BaseBuffer):
             gae_advs[i] = gae
 
         if gae_normalize:
-            gae_advs = (gae_advs - torch.mean(gae_advs) / torch.std(gae_advs))
+            gae_advs = (gae_advs - torch.mean(gae_advs)) / (torch.std(gae_advs) + 1e-5)
 
         self._buffer['values'] = values.cpu().numpy()
         self._buffer['log_probs'] = log_probs.cpu().numpy()

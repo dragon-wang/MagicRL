@@ -175,6 +175,11 @@ class GaussionActor(nn.Module):
     def forward(self, obs):
         x =  self.mlp(obs) if self.feature_net is None else self.mlp(self.feature_net(obs))
         mu = self.fc_mu(x)
+        # Tanh squashes the action to [-act_bound, act_bound].
+        # The reason for pre-squash instead of squash in "sample()" 
+        # is to avoid the actions for calculating "new_log_probes" 
+        # being different from the actions for calculating "old_log_probs".
+        mu = self.act_bound * torch.tanh(mu)  
 
         if self.logstd_min is not None:
             if self.logstd_hard_clip:
@@ -207,7 +212,8 @@ class GaussionActor(nn.Module):
             act = dist.sample()
             log_prob = dist.log_prob(act).sum(1)
         
-        return act.clip(-self.act_bound, self.act_bound), log_prob  # act: (n, m); log_prob: (n, )
+        # not use "self.act_bound * torch.tanh(act)", because the action is already squashed in the dist.
+        return act, log_prob  # act: (n, m); log_prob: (n, )
  
 
 class CVAE(nn.Module):
