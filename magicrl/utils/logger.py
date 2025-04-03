@@ -12,8 +12,8 @@ LOG_DIR = os.path.join(ROOT_DIR, "results")
 def _make_dir(dir):
     if not os.path.exists(dir):
         os.makedirs(dir)
-    else:
-        raise OSError("The result of the given learn_id already exists, please change a different learn_id or delete the existed result.")
+    # else:
+        # raise OSError("The result of the given learn_id already exists, please change a different learn_id or delete the existed result.")
     return dir
 
 

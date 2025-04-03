@@ -98,10 +98,12 @@ class OffPolicyLearner(BaseLearner):
 class OnPolicyLearner(BaseLearner):
     def __init__(self,
                  trajectory_length=128,
+                 mini_batch_size=64,
                  **kwargs):
         super().__init__(**kwargs)
 
         self.trajectory_length = trajectory_length
+        self.mini_batch_size = mini_batch_size
 
     def learn(self):
         try:
@@ -120,9 +122,9 @@ class OnPolicyLearner(BaseLearner):
                 if t_length == self.trajectory_length:
                     # sample data from the buffer and clear the buffer.
                     self.buffer.finish_path(agent=self.agent)
-                    batch = self.buffer.sample(self.trajectory_length, device=self.agent.device)       
+                    mini_batches = self.buffer.sample_mini_batches(self.mini_batch_size, device=self.agent.device)       
                     # train agent with the sampled data.
-                    train_summaries = self.agent.train(batch)
+                    train_summaries = self.agent.train(mini_batches)
 
                     self.buffer.clear()
                     t_length = 0

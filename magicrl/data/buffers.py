@@ -284,6 +284,8 @@ class ReplayBuffer(BaseBuffer):
         pass
 
 class TrajectoryBuffer(BaseBuffer):
+    """Used for PPO.
+    """
     def __init__(self, buffer_size: int = 0):
         super().__init__(buffer_size)
 
@@ -311,6 +313,21 @@ class TrajectoryBuffer(BaseBuffer):
             _to_tensor(samples, device, dtype=dtype)
         return samples
     
+    def sample_mini_batches(self, mini_batch_size, device=None, dtype=torch.float32):
+        assert (self._pointer == self.buffer_size
+                ), f'The buffer is not full. The expected size is {self.buffer_size}, but now is {self._pointer}'
+        batch_start = np.arange(0, self.buffer_size, mini_batch_size)
+        indices = np.arange(self.buffer_size, dtype=np.int32)  # Index to each data in the buffer
+        np.random.shuffle(indices)  # shuffle the indices
+        batch_indices = [indices[i:i + mini_batch_size] for i in batch_start]  # the indices of each batch. eg. [[1,3,5], [2,4,6]]
+        batches = []
+        for index in batch_indices:
+            sample = _get_trans(self._buffer, index)
+            if device is not None:
+                _to_tensor(sample, device, dtype=dtype)
+            batches.append(sample)
+        return batches
+        
     def finish_path(self, agent):
         """This method is called at the end of a trajectory.
         The 'values', 'gae_advs' and 'log_probs' will be computed in this function.
@@ -320,6 +337,7 @@ class TrajectoryBuffer(BaseBuffer):
         rew = torch.as_tensor(self._buffer['rew'], dtype=torch.float32, device=agent.device)
         next_obs = torch.as_tensor(self._buffer['next_obs'], dtype=torch.float32, device=agent.device)
         done = torch.as_tensor(self._buffer['done'], dtype=torch.float32, device=agent.device)
+        term = torch.as_tensor(self._buffer['term'], dtype=torch.float32, device=agent.device)
 
         gamma = agent.gamma
         gae_lambda = agent.gae_lambda
@@ -333,7 +351,7 @@ class TrajectoryBuffer(BaseBuffer):
         gae = 0
         gae_advs = torch.zeros_like(rew, device=agent.device)
         for i in reversed(range(len(rew))):
-            delta = rew[i] + gamma * next_values[i] * (1 - done[i]) - values[i]
+            delta = rew[i] + gamma * next_values[i] * (1 - term[i]) - values[i]
             gae = delta + gamma * gae_lambda * gae * (1 - done[i])
             gae_advs[i] = gae
 
@@ -343,7 +361,6 @@ class TrajectoryBuffer(BaseBuffer):
         self._buffer['values'] = values.cpu().numpy()
         self._buffer['log_probs'] = log_probs.cpu().numpy()
         self._buffer['gae_advs'] = gae_advs.cpu().numpy()
-
 
     def clear(self):
         self._buffer.clear()
@@ -384,7 +401,15 @@ class VectorBuffer:
         if device is not None:
             _to_tensor(samples, device, dtype=dtype)
         return samples
-
+    
+    def sample_mini_batches(self, mini_batch_size, device=None, dtype=torch.float32) -> Dict:
+        """Used for vector TrajectoryBuffer.
+        """
+        batches = []
+        for buffer in self.buffer_list:
+            batches += buffer.sample_mini_batches(mini_batch_size, device, dtype)
+        return batches
+        
     def save(self):
         pass
 

@@ -22,6 +22,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_num', type=int, default=1)
     parser.add_argument('--eval_num', type=int, default=10)
     parser.add_argument('--traj_length', type=int, default=2048)
+    parser.add_argument('--mini_batch_size', type=int, default=64)
     parser.add_argument('--max_train_step', type=int, default=2000000)
     parser.add_argument('--learn_id', type=str, default='ppo_mujoco')
     parser.add_argument('--resume', action='store_true', default=False)
@@ -57,19 +58,18 @@ if __name__ == '__main__':
 
 
     agent = PPO_Agent(actor=actor, 
-                     critic=critic,
-                     actor_lr=3e-4,
-                     critic_lr=3e-4,
-                     gae_lambda=0.95,
-                     gae_normalize=True,
-                     clip_pram=0.2,
-                     ent_coef=0.01,
-                     use_grad_clip=True,
-                     use_lr_decay=True,
-                     train_actor_iters=10,
-                     train_critic_iters=10,
-                     max_train_step=args.max_train_step,
-                     device=args.device)
+                      critic=critic,
+                      actor_lr=3e-4,
+                      critic_lr=3e-4,
+                      gae_lambda=0.95,
+                      gae_normalize=True,
+                      clip_pram=0.2,
+                      ent_coef=0.01,
+                      use_grad_clip=True,
+                      use_lr_decay=True,
+                      train_iters=10,
+                      max_train_step=args.max_train_step,
+                      device=args.device)
 
     # 3.Make Learner and Inferrer.
     if not args.infer:
@@ -80,17 +80,18 @@ if __name__ == '__main__':
                                             buffer_num=args.train_num, 
                                             buffer_class=TrajectoryBuffer)
         
-        learner = OnPolicyLearner( trajectory_length=args.traj_length,
-                                   learn_id=args.learn_id,
-                                   train_env=train_envs,
-                                   eval_env=eval_envs,
-                                   agent=agent,
-                                   buffer=trajectoryBuffer,
-                                   max_train_step=args.max_train_step,
-                                   learner_log_freq=5000,
-                                   agent_log_freq=100000,
-                                   eval_freq=5000,
-                                   resume=args.resume)
+        learner = OnPolicyLearner(trajectory_length=args.traj_length,
+                                  mini_batch_size=args.mini_batch_size,
+                                  learn_id=args.learn_id,
+                                  train_env=train_envs,
+                                  eval_env=eval_envs,
+                                  agent=agent,
+                                  buffer=trajectoryBuffer,
+                                  max_train_step=args.max_train_step,
+                                  learner_log_freq=5000,
+                                  agent_log_freq=100000,
+                                  eval_freq=5000,
+                                  resume=args.resume)
         learner.learn()
 
     else:

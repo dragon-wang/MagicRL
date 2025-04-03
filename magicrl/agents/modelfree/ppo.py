@@ -24,8 +24,7 @@ class PPO_Agent(BaseAgent):
                  ent_coef=0.01,
                  use_grad_clip=False,
                  use_lr_decay=False,
-                 train_actor_iters=10,
-                 train_critic_iters=10,
+                 train_iters=10,
                  max_train_step=None,
                  **kwargs
                  ):
@@ -45,8 +44,7 @@ class PPO_Agent(BaseAgent):
         self.ent_coef = ent_coef
         self.use_grad_clip = use_grad_clip
         self.use_lr_decay  = use_lr_decay
-        self.train_actor_iters = train_actor_iters
-        self.train_critic_iters = train_critic_iters
+        self.train_iters = train_iters
         self.max_train_step = max_train_step
 
         self.attr_names.extend(['actor','critic', 'actor_optim', 'critic_optim'])
@@ -66,43 +64,47 @@ class PPO_Agent(BaseAgent):
         for p in self.critic_optim.param_groups:
             p['lr'] = critic_lr_now
 
-    def train(self, batch):
-        obs, acts, values, old_log_probs, gae_advs = batch['obs'], batch['act'], batch['values'], batch['log_probs'], batch['gae_advs']
-        target_values = gae_advs + values
-        
+    def train(self, mini_batches):
         # Train policy with multiple steps of gradient descent
-        for _ in range(self.train_actor_iters):
-            new_log_probs, new_entropy = self.actor.get_logprob_entropy(obs, acts)
-            ratios = torch.exp(new_log_probs - old_log_probs)
+        actor_loss_list, critic_loss_list, entropy_loss_list, values_list = [], [], [], []
+        for _ in range(self.train_iters):
+            for mini_batch in mini_batches:
+                obs, acts, values, old_log_probs, gae_advs = mini_batch['obs'], mini_batch['act'], mini_batch['values'], mini_batch['log_probs'], mini_batch['gae_advs']
+                target_values = gae_advs + values
+                new_log_probs, new_entropy = self.actor.get_logprob_entropy(obs, acts)
+                ratios = torch.exp(new_log_probs - old_log_probs)
 
-            surrogate = ratios * gae_advs
-            clipped_surrogate = torch.clamp(ratios, 1.0 - self.clip_pram, 1.0 + self.clip_pram) * gae_advs
+                surrogate = ratios * gae_advs
+                clipped_surrogate = torch.clamp(ratios, 1.0 - self.clip_pram, 1.0 + self.clip_pram) * gae_advs
 
-            entropy_loss = new_entropy.mean()
-            actor_loss = -(torch.min(surrogate, clipped_surrogate)).mean() - self.ent_coef * entropy_loss
-            
-            self.actor_optim.zero_grad()
-            actor_loss.backward()
-            if self.use_grad_clip:
-                torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
-            self.actor_optim.step()
+                entropy_loss = new_entropy.mean()
+                actor_loss = -(torch.min(surrogate, clipped_surrogate)).mean() - self.ent_coef * entropy_loss
+                
+                self.actor_optim.zero_grad()
+                actor_loss.backward()
+                if self.use_grad_clip:
+                    torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
+                self.actor_optim.step()
 
-        # Train value function with multiple steps of gradient descent
-        for _ in range(self.train_critic_iters):
-            values = self.critic(obs).squeeze()
-            critic_loss = F.mse_loss(target_values, values)
-            self.critic_optim.zero_grad()
-            critic_loss.backward()
-            if self.use_grad_clip:
-                torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
-            self.critic_optim.step()
+                new_values = self.critic(obs).squeeze()
+                critic_loss = F.mse_loss(target_values, new_values)
+                self.critic_optim.zero_grad()
+                critic_loss.backward()
+                if self.use_grad_clip:
+                    torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
+                self.critic_optim.step()
+
+                actor_loss_list.append(actor_loss.cpu().item())
+                critic_loss_list.append(critic_loss.cpu().item())
+                entropy_loss_list.append(entropy_loss.cpu().item())
+                values_list.append(new_values.mean().cpu().item())
 
         if self.use_lr_decay:
             self._lr_decay()
 
-        train_summaries = {"actor_loss": actor_loss.cpu().item(),
-                           "critic_loss": critic_loss.cpu().item(),
-                           "entropy": entropy_loss.cpu().item(),
-                           'v_mean': values.mean().cpu().item()}
+        train_summaries = {"actor_loss": sum(actor_loss_list)/ len(actor_loss_list),
+                           "critic_loss": sum(critic_loss_list)/len(critic_loss_list),
+                           "entropy_loss": sum(entropy_loss_list)/len(entropy_loss_list),
+                           "values": sum(values_list)/len(values_list)}
 
         return train_summaries 
