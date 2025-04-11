@@ -11,5 +11,9 @@ class GymToGymnasium(gym.Wrapper):
     
     def step(self, action):
         next_obs, reward, done, info = self.env.step(action)
-        return next_obs, reward, done, done, info
+        # The 'truncated' from gym must be False, 
+        # otherwise the 'terminated' transition 
+        # cannot be sampled in the reply buffer, 
+        # resulting in the inability to learn the final state reward.
+        return next_obs, reward, done, False, info
         
